@@ -177,107 +177,11 @@ Set `streaming=False` when a local Arrow dataset is preferable. Both loaders als
 accept `revision` for reproducible snapshot pinning and `token` for authenticated
 Hugging Face access.
 
-## Memory Service API
-
-MegaMem keeps its two network boundaries separate:
-
-| Boundary | Purpose | Configuration |
-| --- | --- | --- |
-| Memory service | Add and query persistent memory from an application | `MEGAMEM_SERVER_URL`, `MEGAMEM_API_KEY` |
-| General model gateway | Build, rerank, judge, and answer with hosted models | Model aliases plus general API environment variables |
-
-`MemoryClient` provides one entry point for deployed and in-process memory operation. A
-core installation can connect to a MegaMem service without importing local model,
-document, or vector-store dependencies:
-
-```python
-import os
-
-from megamem import MemoryClient
-
-memory = MemoryClient(
-    api_key=os.environ["MEGAMEM_API_KEY"],
-    server_url=os.environ["MEGAMEM_SERVER_URL"],
-)
-memory.add(
-    "Quarterly access reviews are due by the final business day.",
-    metadata={"source_id": "policy:access-review"},
-)
-matches = memory.query("When is the access review due?", top_k=5)
-```
-
-Local operation accepts a `DictConfig` plus a user-scoped identifier and exposes file,
-chat, email, planner, and advanced retrieval workflows. See the [API guide](docs/API.md)
-for supported operations, optional dependencies, and error behavior.
-
-## General Model Gateway
-
-Copy the public templates and provide the endpoints used by your run:
-
-```bash
-cp .env.example .env
-cp configs/models.example.yaml configs/models.yaml
-```
+## API
 
 ```dotenv
-LLM_API_BASE=https://your-endpoint.example/v1
-LLM_API_KEY=your-secret
-LLM_CHAT_MODEL=your-chat-model
-LLM_JUDGE_MODEL=your-judge-model
-
-# Optional hosted embeddings; local embeddings are the default.
-MEGAMEM_LOCAL_EMBEDDING=0
-EMBEDDING_API_BASE=https://your-endpoint.example/v1
-EMBEDDING_API_KEY=your-secret
-EMBEDDING_MODEL=your-embedding-model
+API=xxx
 ```
-
-Model names live in `configs/models.yaml`; API keys stay in `.env`. MegaMem exposes one
-hosted provider alias, `general`. The resolver rejects missing aliases, placeholder
-models, and any other provider value before a request is sent. Set
-`MEGAMEM_MODELS_CONFIG` when the alias file is outside the repository root.
-
-The package also exposes the same gateway contract directly, without a vendor SDK:
-
-```python
-import os
-
-from megamem import GeneralAPIClient
-
-gateway = GeneralAPIClient(
-    base_url=os.environ["LLM_API_BASE"],
-    api_key=os.environ["LLM_API_KEY"],
-)
-response = gateway.chat.completions.create(
-    model=os.environ["LLM_CHAT_MODEL"],
-    messages=[{"role": "user", "content": "Summarize the selected evidence."}],
-    max_tokens=256,
-)
-print(response.choices[0].message.content)
-```
-
-All hosted model traffic follows one general contract:
-
-| Operation | Method and path | Required request fields |
-| --- | --- | --- |
-| Chat | `POST /chat/completions` | `model`, `messages`, token limit |
-| Embeddings | `POST /embeddings` | `model`, `input` |
-
-The gateway receives bearer authentication. The client uses plain JSON over HTTP and
-contains no cloud vendor, account resource, provider-specific deployment field, or
-vendor SDK. Routing remains behind the configured endpoint. Local sentence-transformer
-embeddings require no API configuration.
-
-Inspect the active, non-secret configuration and optional dependency groups:
-
-```bash
-megamem doctor
-megamem doctor --json
-megamem config
-```
-
-Use `megamem doctor --strict` in deployment checks when model aliases must be fully
-configured. The command never prints API keys.
 
 ## Package Verification
 
@@ -309,7 +213,6 @@ MegaMem/
 ├── configs/              # public model-routing templates
 ├── examples/             # runnable, credential-free examples
 ├── tests/                # package and method checks
-└── docs/                 # package API documentation
 ```
 
 ## Package Scope
@@ -319,7 +222,6 @@ private or licensed corpora, generated vector indexes, raw model outputs, real
 credentials, provider account configuration, manuscript sources, plotting utilities, or
 benchmark result artifacts.
 
-- [API guide](docs/API.md)
 - [Contribution guide](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 
