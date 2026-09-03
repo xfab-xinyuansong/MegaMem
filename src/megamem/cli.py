@@ -35,6 +35,7 @@ _OPTIONAL_GROUPS = {
         "scipy",
         "sklearn",
     ),
+    "huggingface": ("datasets",),
     "dev": ("build", "pytest", "pytest_timeout"),
 }
 _REQUIRED_MODEL_ALIASES = {"chat_low", "chat_high", "judge"}

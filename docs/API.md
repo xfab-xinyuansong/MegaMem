@@ -12,11 +12,30 @@ interfaces and the installation required for each one.
 | Local memory | `pip install -e ".[retrieval,llm,documents]"` | Vector retrieval, environment loading, builders, file ingestion |
 | Local models | `pip install -e ".[local-models]"` | Local causal-model execution |
 | Evaluation | `pip install -e ".[evaluation]"` | Evaluation metrics |
+| Hugging Face data | `pip install -e ".[huggingface]"` | Streaming loaders for the EnterpriseRAG extension |
 | Development | `pip install -e ".[dev]"` | Tests and package builds |
 
 Optional backends are imported only when their interfaces are used. A core installation
 can therefore import `megamem`, run the CLI, and construct a remote client without
 installing the local retrieval stack.
+
+## Hugging Face Dataset
+
+The optional dataset loaders expose the document and question configurations without
+requiring the complete retrieval stack:
+
+```python
+from megamem import load_enterprise_rag
+
+benchmark = load_enterprise_rag()  # streams both configurations by default
+document = next(iter(benchmark["documents"]))
+question = next(iter(benchmark["questions"]))
+```
+
+Documents contain `doc_id`, `source_type`, `title`, and `content`. Questions contain
+the query and reference answer together with expected document identifiers and answer
+facts. Pass `streaming=False` to materialize Arrow datasets locally, or `revision` to
+pin a specific Hugging Face snapshot.
 
 ## Core Contracts
 

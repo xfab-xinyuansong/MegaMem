@@ -7,6 +7,7 @@
 <p align="center">
   <a href="https://cielara.ai"><img alt="Cielara AI" src="https://img.shields.io/badge/Cielara-AI-6D28D9.svg"></a>
   <a href="https://arxiv.org/abs/2608.22137"><img alt="arXiv 2608.22137" src="https://img.shields.io/badge/arXiv-2608.22137-B31B1B.svg"></a>
+  <a href="https://huggingface.co/datasets/xsong69/enterpriseRAG-extension"><img alt="Hugging Face Dataset" src="https://img.shields.io/badge/%F0%9F%A4%97%20Dataset-EnterpriseRAG--Extension-FFD21E.svg"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-green.svg"></a>
   <a href="pyproject.toml"><img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-blue"></a>
 </p>
@@ -88,6 +89,7 @@ local model runtime. Add only the capability groups needed for a deployment:
 pip install -e ".[retrieval,llm,documents]"  # complete local memory pipeline
 pip install -e ".[local-models]"             # optional local model execution
 pip install -e ".[evaluation]"               # evaluation metrics
+pip install -e ".[huggingface]"              # Hugging Face dataset streaming
 pip install -e ".[dev]"                      # tests and package build tools
 ```
 
@@ -121,6 +123,31 @@ ledger = TokenLedger(run_id="demo", method="dual-view")
 ledger.record("retrieval", "local", input_tokens=7, output_tokens=0, wall_seconds=0.01)
 print(ledger.grand_total())
 ```
+
+## Hugging Face Dataset
+
+MegaMem can stream the public
+[EnterpriseRAG extension](https://huggingface.co/datasets/xsong69/enterpriseRAG-extension)
+without materializing the full corpus locally. The dataset exposes separate
+`documents` and `questions` configurations in the schema expected by the benchmark.
+
+```bash
+pip install -e ".[huggingface]"
+```
+
+```python
+from megamem import load_enterprise_rag_documents, load_enterprise_rag_questions
+
+documents = load_enterprise_rag_documents()  # streaming=True by default
+questions = load_enterprise_rag_questions()
+
+first_document = next(iter(documents))
+first_question = next(iter(questions))
+```
+
+Set `streaming=False` when a local Arrow dataset is preferable. Both loaders also
+accept `revision` for reproducible snapshot pinning and `token` for authenticated
+Hugging Face access.
 
 ## Memory Service API
 

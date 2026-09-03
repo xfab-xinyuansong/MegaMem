@@ -12,6 +12,9 @@ __all__ = [
     "GeneralAPIError",
     "MemoryClient",
     "TokenLedger",
+    "load_enterprise_rag",
+    "load_enterprise_rag_documents",
+    "load_enterprise_rag_questions",
     "validate_batch",
     "validate_one",
     "__version__",
@@ -25,6 +28,15 @@ _EXPORTS = {
     "GeneralAPIError": ("megamem.core.general_api", "GeneralAPIError"),
     "MemoryClient": ("megamem.client", "MemoryClient"),
     "TokenLedger": ("megamem.methods", "TokenLedger"),
+    "load_enterprise_rag": ("megamem.huggingface", "load_enterprise_rag"),
+    "load_enterprise_rag_documents": (
+        "megamem.huggingface",
+        "load_enterprise_rag_documents",
+    ),
+    "load_enterprise_rag_questions": (
+        "megamem.huggingface",
+        "load_enterprise_rag_questions",
+    ),
     "validate_batch": ("megamem.methods", "validate_batch"),
     "validate_one": ("megamem.methods", "validate_one"),
 }
@@ -36,7 +48,7 @@ def __getattr__(name: str) -> Any:
     Keeping the top-level import light makes version checks, packaging, and the
     representation-level tests independent of optional retrieval backends.
     """
-    if name in {"browser", "methods", "utils"}:
+    if name in {"browser", "huggingface", "methods", "utils"}:
         module = import_module(f"{__name__}.{name}")
         globals()[name] = module
         return module
@@ -50,4 +62,6 @@ def __getattr__(name: str) -> Any:
 
 def __dir__() -> list[str]:
     """List both core exports and lazily available optional interfaces."""
-    return sorted(set(globals()) | set(_EXPORTS) | {"browser", "methods", "utils"})
+    return sorted(
+        set(globals()) | set(_EXPORTS) | {"browser", "huggingface", "methods", "utils"}
+    )

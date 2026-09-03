@@ -60,6 +60,7 @@ def test_doctor_json_is_safe_and_machine_readable(capsys) -> None:
         "dev",
         "documents",
         "evaluation",
+        "huggingface",
         "llm",
         "local-models",
         "retrieval",
@@ -68,11 +69,18 @@ def test_doctor_json_is_safe_and_machine_readable(capsys) -> None:
 
 
 def test_package_root_exposes_lightweight_method_api() -> None:
-    from megamem import DualNode, GeneralAPIClient, TokenLedger, validate_batch
+    from megamem import (
+        DualNode,
+        GeneralAPIClient,
+        TokenLedger,
+        load_enterprise_rag_documents,
+        validate_batch,
+    )
 
     assert GeneralAPIClient.__name__ == "GeneralAPIClient"
     assert DualNode.__name__ == "DualNode"
     assert TokenLedger.__name__ == "TokenLedger"
+    assert callable(load_enterprise_rag_documents)
     assert callable(validate_batch)
 
 
