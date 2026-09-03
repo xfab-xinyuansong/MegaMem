@@ -30,6 +30,34 @@ evidence within a fixed budget reaches the answer model.
 
 <p align="center"><em>The persistent context can grow to approximately 650M tokens while each query loads only a small, source-resolved evidence context for answering.</em></p>
 
+## Evidence-Driven Design Exploration
+
+<p align="center">
+  <img src="assets/megamem_design_exploration.png" width="100%" alt="Evidence-driven progression from hierarchical memory to the complete MegaMem design">
+</p>
+
+<p align="center"><em>MegaMem emerged through a measure-diagnose-revise loop: each mechanism addresses a failure exposed by the preceding design.</em></p>
+
+The initial hierarchy compressed access but weakened recall. A second, detailed view
+restored exact evidence; cross-encoder reranking suppressed near-neighbor noise; query
+expansion bridged terminology mismatches; and post-answer citation extraction retained
+only the sources actually used. Each addition was kept only after re-evaluating the
+complete pipeline.
+
+## Distilled and Detailed Memory
+
+<p align="center">
+  <img src="assets/megamem_distilled_detailed_memory.png" width="100%" alt="Document chunking, typed memory distillation, multi-route retrieval, and evidence resolution">
+</p>
+
+<p align="center"><em>Compact typed memories provide broad retrieval routes, while stable document identifiers resolve every selected memory hit back to detailed source evidence.</em></p>
+
+Documents are divided into detailed chunks and distilled into typed facts,
+requirements, and decisions that retain their source identifiers. At query time,
+detailed and distilled indexes are searched together, their candidates are fused and
+reranked, and selected memory hits are resolved to detailed chunks. Only the
+highest-ranked source evidence that fits the answer budget is loaded for generation.
+
 ## Multi-Route Recall and Post-Answer Attribution
 
 <p align="center">
