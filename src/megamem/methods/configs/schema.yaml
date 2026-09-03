@@ -1,0 +1,72 @@
+# Released experiment configuration schema.
+# Every experiment must be invokable with one config conforming to this schema.
+#
+# The runner validates the loaded config against this schema. Validation
+# failures (especially the FORBIDDEN_KEYS checks) MUST abort execution loudly.
+
+config_schema_version: "v4.0.0"
+
+required_fields:
+  - run_id              # unique stable run identifier
+  - dataset             # one of: own_full | erag_50m | erag_100m | erag_150m | erag_250m
+  - method              # one of: B1, B2, B3, B4, B5, V3-NG, V4
+  - seed                # query-order seed (positive integer)
+  - models              # {hierarchy_low: <alias>, hierarchy_high: <alias>, answer: <alias>, judge: <alias>}
+  - paths               # {corpus, queries, chroma, output, manifest}
+  - tokenizer           # name + version (e.g., cl100k_base + tiktoken 0.13.0)
+
+optional_fields:
+  - promotion           # only required for V4 / B5 (state machine config)
+  - decay               # only required for V4 (decay window, tau, budget)
+  - dual_index          # only required for methods that use dual index (B4, B5, V4)
+  - notes               # free-form
+
+# === ISOLATION CHECK  ===
+# These guards prevent accidental protocol drift and hidden subsampling.
+# The runner MUST reject any config containing these keys/values:
+
+FORBIDDEN_KEYS:
+  - "governance"
+  - "rbac"
+  - "memory_access"
+  - "access_label"
+  - "deterministic_access_comparison"
+  - "redaction_accuracy"
+  - "over_refusal"
+  - "allow_redact_refuse"
+  - "evermemos"
+  - "solution1"
+  - "max_docs"
+  - "max_queries"
+  - "n_evidence_max"
+  - "first_n"
+  - "subset"
+  - "limit_queries"
+  - "limit_docs"
+  - "sample_queries"
+  - "random_query_subsample"
+  - "skip_failed_queries"
+
+FORBIDDEN_DATASETS:
+  - "locomo"
+  - "locomo_plus"
+  - "locomo10"
+  - "own_rag_subset"
+  - "erag_subset"
+
+# Promotion config (V4 only)
+promotion_schema:
+  required:
+    - score_weights         # {w1..w5} for relevance / uncertainty / EIG / hist_utility / detail_cost
+    - decision_mode         # "llm" (full system) | "fixed_threshold" (A5 ablation)
+    - promotion_budget      # max simultaneously-PROMOTED nodes
+  optional:
+    - decision_log_path     # where to dump structured promotion decisions
+
+decay_schema:
+  required:
+    - tau                   # recency time constant (queries)
+    - decay_window          # number of queries without use before demote
+    - utility_floor         # if utility < this, demote
+  optional:
+    - precompute_baseline   # offline-only utility computation

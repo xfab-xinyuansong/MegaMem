@@ -1,0 +1,53 @@
+# Model Aliases (example)
+#
+# Every hosted alias uses the public provider value `general` and resolves to one
+# configured model gateway. If a required alias is missing, the runner fails
+# loudly; it must never silently substitute a different model family.
+
+aliases:
+  chat_low:
+    provider: general
+    base_url_env: "LLM_API_BASE"
+    api_key_env: "LLM_API_KEY"
+    model: "YOUR_CHAT_MODEL"
+    token_parameter: "max_tokens"
+    family: "low-tier chat model"
+    notes: "Used for high-volume build calls."
+
+  chat_high:
+    provider: general
+    base_url_env: "LLM_API_BASE"
+    api_key_env: "LLM_API_KEY"
+    model: "YOUR_CHAT_MODEL"
+    token_parameter: "max_tokens"
+    family: "high-tier chat model"
+    notes: "Swap explicitly when replaying runs with a different model."
+
+  judge:
+    provider: general
+    base_url_env: "LLM_API_BASE"
+    api_key_env: "LLM_API_KEY"
+    model: "YOUR_JUDGE_MODEL"
+    token_parameter: "max_tokens"
+    family: "judge model"
+    notes: "Keep fixed across comparisons whenever possible."
+
+  secondary_extraction:
+    provider: general
+    base_url_env: "SECONDARY_LLM_API_BASE"
+    api_key_env: "SECONDARY_LLM_API_KEY"
+    model: "YOUR_SECONDARY_LLM_MODEL"
+    token_parameter: "max_tokens"
+    family: "secondary extraction model"
+    notes: "Use only when explicitly enabled in the run config."
+
+embedding:
+  provider: local
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  dim: 384
+  notes: "Swap for a hosted embedding model only when the change is recorded."
+
+substitution_policy:
+  - rule: "Every alias used by a run must resolve to one concrete model."
+  - rule: "If an alias has `provider: UNRESOLVED`, code must raise RuntimeError."
+  - rule: "Model substitutions require an explicit config change and a recorded run id."
