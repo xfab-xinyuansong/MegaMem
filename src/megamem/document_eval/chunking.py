@@ -1,16 +1,4 @@
-"""
-Document → Section → Chunk segmentation utilities.
-
-For EnterpriseRAG documents (slack threads, gmail, confluence, github issues,
-etc.) we use a simple but deterministic structural splitter:
-- Split on markdown-ish headings (##, ###) for confluence/wiki content
-- Split on blank-line paragraphs as fallback
-- Sub-chunk paragraphs that exceed chunk_target_tokens
-- Each chunk records section_path / section_id / chunk_id deterministically
-
-For Slack/gmail-style content with no headings, the entire document is one
-section; chunks are token-bounded paragraphs.
-"""
+"""Document → Section → Chunk segmentation utilities."""
 from __future__ import annotations
 
 import re

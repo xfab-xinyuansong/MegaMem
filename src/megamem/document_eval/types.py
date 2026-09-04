@@ -9,11 +9,6 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 
-# ---------------------------------------------------------------------------
-# Layer 4 — Chunk and Memory (shared between DDI / HDM / CDM)
-# ---------------------------------------------------------------------------
-
-
 @dataclass
 class RawChunkEntry:
     """Raw chunk preserved verbatim from a source document.
@@ -139,11 +134,6 @@ class CognitiveEntry:
         }
 
 
-# ---------------------------------------------------------------------------
-# Layer 2/3 — Document and Section summaries (HDM)
-# ---------------------------------------------------------------------------
-
-
 @dataclass
 class SectionNode:
     section_id: str
@@ -201,11 +191,6 @@ class DocumentNode:
             "token_count": self.token_count,
             "entry_kind": "document_summary",
         }
-
-
-# ---------------------------------------------------------------------------
-# Retrieval config (Option A with toggles for B/C ablations)
-# ---------------------------------------------------------------------------
 
 
 @dataclass

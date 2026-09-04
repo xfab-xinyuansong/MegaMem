@@ -1,18 +1,4 @@
-"""MegaMem source-level dual-view node builder.
-
-The builder converts each source-level record into a ``DualNode`` by:
-
-  - detailed_text = the original full L0 body (canonical_label + raw_text)
-  - distilled_text = a short LLM-generated summary via the `chat_low` alias
-  - source_evidence_ids = the L0 node's evidence_span_ids
-  - distilled_tokens / detailed_tokens computed via tiktoken cl100k_base
-
-Concurrency control:
-  - ThreadPoolExecutor with configurable workers (default 8)
-  - the chat API client handles 429 retries via max_retries; we add an extra
-    light-touch retry with exponential backoff for hard 429s
-  - Token usage is recorded into the supplied TokenLedger
-"""
+"""MegaMem source-level dual-view node builder."""
 from __future__ import annotations
 
 import logging
@@ -35,10 +21,6 @@ from .token_ledger import (
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Prompts
-# ---------------------------------------------------------------------------
-
 DISTILL_SYSTEM_PROMPT = """You are an enterprise memory summarizer. Given a long-form L0 memory record from a corporate dataset, produce a SHORT distilled summary that:
 
 - captures the central topic, entities, time references, and any explicit decisions or values stated
@@ -56,10 +38,6 @@ DISTILL_USER_TEMPLATE = """L0 record body:
 
 Distilled summary:"""
 
-
-# ---------------------------------------------------------------------------
-# LLM call through the general chat API
-# ---------------------------------------------------------------------------
 
 # Module-level general client cache
 _GENERAL_CLIENT = None
@@ -160,11 +138,6 @@ def llm_distill_one(body: str, max_retries: int = 4) -> Dict[str, Any]:
         "error": f"{type(last_err).__name__}: {str(last_err)[:200]}",
         "attempts": max_retries + 1,
     }
-
-
-# ---------------------------------------------------------------------------
-# Public entrypoint
-# ---------------------------------------------------------------------------
 
 
 def build_l0_dualnodes(

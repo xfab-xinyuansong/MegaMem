@@ -33,28 +33,7 @@ _KNOWN_MEMORY_FIELDS = {
 
 
 class MemoryEntry(BaseModel):
-    """
-    Canonical memory entry shared by query and build pipelines.
-
-    Provides a single object shape for memories whether they come from
-    semantic search (query) or extraction (build). It bundles the
-    memory content, its metadata, scoring information and temporal
-    details into one type.
-
-    Usage:
-        # From query results
-        entry = MemoryEntry.from_query_result(query_dict)
-
-        # From build results
-        entry = MemoryEntry.from_build_result(build_dict)
-
-        # Direct instantiation
-        entry = MemoryEntry(
-            value="User prefers dark theme",
-            index="user_interface_preference",
-            score=0.85
-        )
-    """
+    """Canonical memory entry shared by query and build pipelines."""
 
     # Core memory payload
     value: str = Field(
@@ -152,9 +131,6 @@ class MemoryEntry(BaseModel):
         description="Cue classification: '' (primary), 'topical' (regular cue), 'source' (source cue)"
     )
 
-    # Additional metadata fields stored on source cues (sender, subject, title, etc.)
-    # ChromaDB persists these even though they have no dedicated MemoryEntry field.
-    # from_dict() captures them so round-trips preserve every metadata key.
     extra_metadata: Optional[Dict[str, Any]] = Field(
         default_factory=dict,
         description="Additional metadata fields (sender, subject, title, source_ref, etc.)"
@@ -197,19 +173,7 @@ class MemoryEntry(BaseModel):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'MemoryEntry':
-        """
-        Build a MemoryEntry from a plain dictionary.
-
-        Recognized keys are mapped to the corresponding MemoryEntry fields.
-        Anything else (e.g., sender, subject, title, source_ref) ends up in
-        extra_metadata so we don't lose information across round-trips.
-
-        Args:
-            data: Dictionary describing a memory entry
-
-        Returns:
-            MemoryEntry: Materialized memory entry
-        """
+        """Build a MemoryEntry from a plain dictionary."""
         data = dict(data)  # shallow copy so we don't mutate caller's dict
         data["history"] = json.loads(data.get("history", "[]"))
         data["image_urls"] = json.loads(data.get("image_urls", "[]"))

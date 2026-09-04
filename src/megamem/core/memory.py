@@ -48,26 +48,7 @@ class AgentMemory(MemoryBase):
     """
 
     def __init__(self, cfg: DictConfig, user_id: str):
-        """
-        Bootstrap the memory facade with the configured backend and helpers.
-
-        Wires up everything needed for memory operations:
-        - Storage backend (local ChromaDB or HTTP)
-        - Query generator for query-time enhancements
-        - Memory builder for extracting memories and applying update logic
-        - Similarity thresholds for intelligent memory management
-
-        Args:
-            cfg: Configuration object containing memory settings including:
-                - memory.backend: Storage backend type ('local' or 'http')
-                - memory.query_score_threshold: Minimum similarity for query results
-                - memory.update_score_threshold: Minimum similarity for update consideration
-                - memory.multimodal_support: Whether to enable multimodal processing (default: True)
-                - Additional backend-specific configuration
-
-        Raises:
-            ValueError: When an unsupported backend type is requested
-        """
+        """Bootstrap the memory facade with the configured backend and helpers."""
         self.cfg = cfg
 
         # User identifier owning this memory facade.
@@ -225,7 +206,6 @@ class AgentMemory(MemoryBase):
         """Delegate to the shared ``merge_with_rrf`` helper."""
         return merge_with_rrf(result_lists, weights=weights, k=k)
 
-
     def _search_source_cues(
         self,
         step,
@@ -233,22 +213,7 @@ class AgentMemory(MemoryBase):
         top_k: int,
         latency_tracker,
     ) -> List[MemoryEntry]:
-        """
-        SS(source_cues): semantic search over source-cue descriptions.
-
-        Builds a ChromaDB where clause from the step's metadata fields
-        (data_type, timestamps), restricts to source cues (cue_type="source"),
-        then layers on a score threshold and string post-filters (sender,
-        recipients, author, title) lifted from the same step.
-
-        Used in patterns 3–5:
-          3. SS(source_cues) → RESOLVE(metadata_summary)
-          4. SS(source_cues) → RESOLVE(full_content)
-          5. SS(source_cues) → SS(primary_memories)
-
-        Returns:
-            List of filtered source cue MemoryEntry objects.
-        """
+        """SS(source_cues): semantic search over source-cue descriptions."""
         from megamem.core.retrieval_planner import (
             build_where_clause, get_string_filters,
             merge_where_clauses, apply_string_filters,
@@ -299,23 +264,7 @@ class AgentMemory(MemoryBase):
         filtered_source_cues,
         latency_tracker,
     ) -> List[MemoryEntry]:
-        """
-        SS(primary_memories): semantic search over extracted facts/details.
-
-        Metadata fields aren't applied here — primary memories don't carry
-        source-level metadata. Only query_text and scope influence the search.
-
-        When scope="filtered_results" and source cues are available (pattern 5),
-        the search is scoped to the primary memories linked by those source cues.
-        Otherwise (pattern 6), it sweeps every primary memory.
-
-        Used in patterns 5–6:
-          5. SS(source_cues) → SS(primary_memories, scope=filtered_results)
-          6. SS(primary_memories, scope=all_sources)
-
-        Returns:
-            List of MemoryEntry objects.
-        """
+        """SS(primary_memories): semantic search over extracted facts/details."""
         # Primary memories: not cue indices and tagged factual.
         primary_condition = {"$and": [
             {"linked_memory": {"$eq": ""}},
@@ -383,18 +332,12 @@ class AgentMemory(MemoryBase):
         )
         return results
 
-    # ------------------------------------------------------------------
-    # Plan validation
-    # ------------------------------------------------------------------
-
     # The 6 valid plan signatures, expressed as tuples of (op, target) per step.
     # target is None for FILTER and RESOLVE.
     _VALID_PLAN_SHAPES = {
         # Pattern 1: FILTER → RESOLVE(metadata_summary)
         (("FILTER", None), ("RESOLVE", None)),
-        # Pattern 2: FILTER → RESOLVE(full_content)  — same shape, return_mode differs
-        # (covered by pattern 1 shape)
-        # Pattern 3-4: SS(source_cues) → RESOLVE
+
         (("SEMANTIC_SEARCH", "source_cues"), ("RESOLVE", None)),
         # Pattern 5: SS(source_cues) → SS(primary_memories)
         (("SEMANTIC_SEARCH", "source_cues"), ("SEMANTIC_SEARCH", "primary_memories")),
@@ -409,20 +352,7 @@ class AgentMemory(MemoryBase):
     _VALID_DATA_TYPES = {"mail", "doc", "teams"}
 
     def _validate_plan(self, plan, context: str) -> List[str]:
-        """
-        Validate a RetrievalPlan ahead of execution.
-
-        Checks:
-          1. Step count (1–2 only).
-          2. Plan shape against one of the 6 known patterns.
-          3. Per-step field validity (return_mode, target, scope).
-          4. Warns about meaningless fields (e.g. sender on primary_memories).
-
-        Returns:
-            List of warning/error strings.  An empty list means the plan is valid.
-            Entries beginning with "ERROR:" are fatal — the plan must not run.
-            Entries beginning with "WARN:" are advisory — execution may proceed.
-        """
+        """Validate a RetrievalPlan ahead of execution."""
         issues: List[str] = []
         steps = plan.steps
 
@@ -510,51 +440,7 @@ class AgentMemory(MemoryBase):
         top_k: int = 5,
         latency_tracker=None,
     ) -> List[MemoryEntry]:
-        """
-        Execute a planner-driven retrieval pipeline.
-
-        The RetrievalPlanner inspects the query and emits a 1–2 step plan
-        built from three primitives: FILTER, SEMANTIC_SEARCH, and RESOLVE.
-
-        Six valid plan patterns:
-
-          1. FILTER → RESOLVE(metadata_summary)
-             Pure listing by metadata. FILTER eagerly fetches source cues,
-             RESOLVE returns their descriptions + metadata.
-
-          2. FILTER → RESOLVE(full_content)
-             Filtered summarization. FILTER fetches source cues,
-             RESOLVE returns entries tagged for full-content retrieval.
-
-          3. SS(source_cues) → RESOLVE(metadata_summary)
-             Semantic discover + list. SS finds source cues by content,
-             RESOLVE returns metadata summaries.
-
-          4. SS(source_cues) → RESOLVE(full_content)
-             Semantic discover + summarize. SS finds source cues,
-             RESOLVE returns entries for full-content retrieval.
-
-          5. SS(source_cues) → SS(primary_memories, scope=filtered_results)
-             Hierarchical drill-down. SS finds relevant sources,
-             then drills into their linked primary memories.
-
-          6. SS(primary_memories, scope=all_sources)
-             Direct fact lookup. Single-step search over all
-             primary memories by query_text.
-
-        State flow:
-          - ``filtered_source_cues``: populated by FILTER or SS(source_cues),
-            consumed by RESOLVE or SS(primary_memories, scope=filtered_results).
-          - ``memory_results``: the final output, set by the last step.
-
-        Args:
-            context: Normalized query string
-            top_k: Maximum results to return
-            latency_tracker: Optional latency tracker
-
-        Returns:
-            List of MemoryEntry objects
-        """
+        """Execute a planner-driven retrieval pipeline."""
         from megamem.core.retrieval_planner import (
             RetrievalPlanner, build_where_clause,
             get_string_filters, apply_string_filters,
@@ -601,16 +487,6 @@ class AgentMemory(MemoryBase):
                 fallback_step, context, top_k, None, latency_tracker
             )
 
-
-        # NOTE(tuning): top_k seeds every intermediate fetch multiplier below.
-        # Four hardcoded decisions to revisit later:
-        # FILTER: limit = top_k * 5  (source cue fetch)
-        # SS(source_cues): raw fetch = top_k * 3  (before threshold + string filters)
-        # SS(primary, scoped): search_n = max(top_k * 5, 50)  (before scope post-filter)
-        # SS(primary, all): raw fetch = top_k  (no multiplier — tightest)
-        # These are first-implementation values that can be tuned later.
-
-
         # --- Step execution ---
         # State carried between steps:
         filtered_source_cues = None        # produced by FILTER or SS(source_cues)
@@ -618,9 +494,6 @@ class AgentMemory(MemoryBase):
 
         for step in plan.steps:
 
-            # --- FILTER (patterns 1–2) ---
-            # Pure metadata lookup. Always eagerly fetches source cues
-            # for the subsequent RESOLVE step.
             if step.op == "FILTER":
                 where_clause = build_where_clause(step)
                 string_filters = get_string_filters(step)
@@ -646,9 +519,7 @@ class AgentMemory(MemoryBase):
                 query_text = step.query_text or context
 
                 if step.target == "source_cues":
-                    # SS(source_cues) — patterns 3, 4, 5
-                    # Semantic search over source cue descriptions.
-                    # Result is staged as filtered_source_cues for the next step.
+
                     filtered_source_cues = self._search_source_cues(
                         step, query_text, top_k, latency_tracker,
                     )
@@ -675,9 +546,6 @@ class AgentMemory(MemoryBase):
                         filtered_source_cues, latency_tracker,
                     )
 
-            # --- RESOLVE (patterns 1–4) ---
-            # Structured extraction over source cues produced by FILTER or
-            # SS(source_cues). Always the final step.
             elif step.op == "RESOLVE":
                 if filtered_source_cues is None:
                     logger.warning(
@@ -705,23 +573,7 @@ class AgentMemory(MemoryBase):
         top_k: int = 5,
         latency_tracker=None,
     ) -> List[MemoryEntry]:
-        """
-        Planner-driven retrieval pipeline.
-
-        Inspects the query and produces a step-based plan using
-        FILTER, RESOLVE, and SEMANTIC_SEARCH primitives.
-        Use this for source-aware queries.
-
-        For simple semantic search, use query() instead.
-
-        Args:
-            context: Search context (str, List[str], or structured context)
-            top_k: Maximum results to return
-            latency_tracker: Optional latency tracker
-
-        Returns:
-            List of MemoryEntry objects
-        """
+        """Planner-driven retrieval pipeline."""
         context = context_to_str(context)
         return self._execute_planner_query(
             context=context,
@@ -742,56 +594,7 @@ class AgentMemory(MemoryBase):
         enable_llm_filter: bool = False,
         latency_tracker = None,
     ):
-        """
-        Carry out an intelligent semantic search to surface relevant memories.
-
-        For planner-driven retrieval (source-aware, multi-step) use
-        planner_query() instead.
-
-        This method orchestrates memory retrieval via:
-        - Vector similarity search for semantic matching
-        - Optional keyword-based search for exact term matching (hybrid search)
-        - Optional LLM-driven query enhancement to widen the recall net
-        - Similarity threshold filtering to keep results relevant
-        - Deduplication so the same memory does not appear repeatedly
-        - Metadata-based filtering for user/context-specific results
-
-        Pipeline:
-        1. Normalize the input context to a single string format
-        2. Optionally have an LLM enhance the query into multiple variants
-        3. If hybrid search is on, extract keywords for the keyword path
-        4. Run vector search and/or keyword search against the store
-        5. Merge and deduplicate the resulting hit lists
-        6. Filter by the configured similarity threshold
-        7. Return the ranked, relevant memories with their metadata
-
-        Args:
-            context: Search context in flexible formats:
-                - str: Natural language query text
-                - List[str]: Multiple query strings to search
-                - List[Dict[str, str]]: Structured context with key-value pairs
-            top_k: Maximum number of results to return per query
-            where: ChromaDB filter conditions for metadata-based filtering
-                Example: {"user_id": "user-1", "timestamp": {"$gt": "2023-01-01"}}
-            include: Fields to include in results ["metadatas", "distances", "documents"]
-            enhance_query: Whether to use LLM to generate enhanced query variants
-            return_history: Whether to include memory update history in results
-            enable_hybrid_search: Whether to enable hybrid search combining semantic and keyword search
-            enable_llm_filter: Whether to use LLM to filter irrelevant memories
-            query_mode: decide if we want to search with cue index (ORIGINAL, PRIMARY_ONLY, CUE_ONLY, BOTH)
-            latency_tracker: Optional LatencyTracker for performance measurement
-
-        Returns:
-            List[Dict]: Ranked list of relevant memories, each containing:
-                - memory: The memory content/value
-                - metadata: Associated metadata (query, index, timestamp, etc.)
-                - score: Similarity score (0-1, higher = more similar)
-
-        Note:
-            Deduplication keeps the same memory from appearing multiple times
-            when enhanced queries overlap or when combining semantic and
-            keyword search results.
-        """
+        """Carry out an intelligent semantic search to surface relevant memories."""
 
         # Normalize the context to a single string.
         context = context_to_str(context)
@@ -1041,20 +844,7 @@ class AgentMemory(MemoryBase):
     def get_episodic_memories_for_results(
         self, memory_results: List[MemoryEntry]
     ) -> Dict[str, MemoryEntry]:
-        """
-        Retrieve episodic memories linked from the supplied factual memories.
-
-        This method:
-        1. Collects every episodic_memory_id from the factual memories
-        2. Deduplicates those IDs (multiple factual memories may share an episode)
-        3. Fetches the actual episodic memory entries
-
-        Args:
-            memory_results: List of factual memory entries from query results
-
-        Returns:
-            Dict mapping episodic_memory_id to MemoryEntry for all linked episodes
-        """
+        """Retrieve episodic memories linked from the supplied factual memories."""
         # Collect every unique episodic ID.
         episodic_ids: set = set()
         for entry in memory_results:
@@ -1133,9 +923,6 @@ class AgentMemory(MemoryBase):
         # Persist each cue-index entry.
         for cue_index in entry.get_cue_indices():
 
-            # Skip the cue index in two cases:
-            # 1. the cue index is already a primary index
-            # 2. the cue index matches the current primary index
             cue_entry = self._store.get(cue_index)
             if (cue_entry and cue_entry.is_primary_index()) or cue_index == entry.index:
                 # Drop this cue index since it's already a primary index.
@@ -1185,32 +972,7 @@ class AgentMemory(MemoryBase):
         timestamp_unix: int = 0,
         extra_metadata: Optional[Dict[str, str]] = None,
     ) -> str:
-        """
-        Add a source-cue index entry that links to all memories from a source.
-
-        A source cue is a cue-index record whose 'index' is a rich natural-language
-        description of the source (email/document). It stores linked_memory pointers
-        to every primary memory extracted from that source so source-level
-        retrieval works via semantic search over the description.
-
-        Also backlinks: each linked primary memory's cue_indices field is updated
-        to include this source cue, enabling bidirectional traversal.
-
-        Args:
-            source_description: Natural-language description of the source
-                (e.g., "Email from Sarah Johnson about Q3 budget review, sent Feb 10 2026")
-            linked_memory_indices: List of primary memory index strings from this source
-            data_type: Source category — "mail", "doc", or ""
-            timestamp_unix: Unix timestamp (seconds) of the source event
-            extra_metadata: Additional filterable metadata fields to store on the source cue.
-                Pre-sanitized by _extract_filterable_metadata() using
-                _FILTERABLE_FIELDS_REGISTRY as the single source of truth for
-                allowed keys and normalization per data_type.
-                All values should be pre-normalized (lowercased where appropriate).
-
-        Returns:
-            Record ID of the source cue entry
-        """
+        """Add a source-cue index entry that links to all memories from a source."""
         if not linked_memory_indices:
             logger.warning("add_source_cue called with no linked memories. Skipping.")
             return ""
@@ -1234,10 +996,6 @@ class AgentMemory(MemoryBase):
         if data_type:
             metadata["data_type"] = data_type
 
-        # Layer in extra metadata fields used by RESOLVE queries.
-        # Callers must sanitize via _extract_filterable_metadata()
-        # (which uses _FILTERABLE_FIELDS_REGISTRY as the single source of truth
-        # for allowed keys and normalization per data_type).
         if extra_metadata:
             for key, value in extra_metadata.items():
                 if value is not None:
@@ -1332,9 +1090,7 @@ class AgentMemory(MemoryBase):
                 # Normal path — proceed to delete the cue index.
                 pass
             elif cue_entry.is_primary_index():
-                # Expected edge case: the cue phrase has since been promoted to a primary index
-                # (a cue phrase ends up reused as the primary index for a different memory,
-                # mirroring the check we do inside add()).
+
                 logger.info(
                     f"Skipping cue index '{cue_index}' during deletion: "
                     f"converted to primary index"

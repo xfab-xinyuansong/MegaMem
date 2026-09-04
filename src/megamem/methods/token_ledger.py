@@ -1,20 +1,4 @@
-"""MegaMem per-phase, per-model token accounting.
-
-The ledger reports separately:
-  - hierarchy_build_input/output
-  - distilled_representation
-  - detailed_representation
-  - distilled_retrieval/navigation
-  - promotion_decision
-  - promoted_detailed_context
-  - final_answer
-  - per-query and per-correct-answer aggregates
-
-This ledger keeps a single in-memory structure for the lifetime of a run, and
-writes it out at end as JSON. It is thread-safe (one lock around mutations).
-
-It estimates API cost only when the caller supplies an explicit price table.
-"""
+"""MegaMem per-phase, per-model token accounting."""
 from __future__ import annotations
 
 import json
@@ -24,19 +8,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 
-# ---------------------------------------------------------------------------
-# Price table (USD per 1M tokens).
-#
-# Pricing changes independently of this package, so MegaMem does not ship
-# provider prices. Pass TokenLedger(prices={...}) to enable cost estimates.
-# ---------------------------------------------------------------------------
-
 DEFAULT_PRICES: Dict[str, Dict[str, float]] = {}
 
-
-# ---------------------------------------------------------------------------
-# Accounting categories
-# ---------------------------------------------------------------------------
 
 PHASE_HIERARCHY_BUILD = "hierarchy_build"
 PHASE_DISTILLED_GEN = "distilled_text_gen"
@@ -76,9 +49,7 @@ class TokenLedger:
                  alias_chosen_at: str = "",
                  alias_chosen_by: str = ""):
         self.prices = DEFAULT_PRICES if prices is None else prices
-        # ``export`` computes aggregate totals while holding this lock.  An
-        # RLock preserves a consistent snapshot without deadlocking when it
-        # calls ``grand_total``.
+
         self._lock = threading.RLock()
         self._records: List[CallRecord] = []
         self._totals_by_phase: Dict[str, Dict[str, int]] = {}

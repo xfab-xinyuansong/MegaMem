@@ -82,11 +82,7 @@ class LocalMemoryClient:
         Returns:
             MemoryBuilder instance
         """
-        # Mapping from file types to memory builder types.
-        # Most file types currently route to the chat builder, but the table is extensible.
-        # Emails are closer to documents structurally; a dedicated email builder
-        # (decisions, attendees, ...) can be plugged in later.
-        # Structured file processors emit text segments consumed by the document builder.
+
         builder_type_mapping = {
             "default": "chat",
             "chat": "chat",
@@ -126,21 +122,7 @@ class LocalMemoryClient:
         builder: Optional[Union[str, Type[MemoryBuilder], MemoryBuilder]] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
     ) -> List[MemoryEntry]:
-        """Add memory content from a file; user_id is stamped automatically.
-
-        Args:
-            file_path: Path to the file to add.
-            metadata: Additional metadata to store with the memory record
-            builder: Optional custom builder. Can be:
-                    - str: Builder type name (e.g., 'chat', 'markdown', 'doc')
-                    - Type[MemoryBuilder]: MemoryBuilder class to instantiate
-                    - MemoryBuilder: Custom MemoryBuilder instance
-                    - None: Auto-detect based on file type (default)
-            progress_callback: Optional callback for progress updates (current, total, message)
-
-        Returns:
-            Created or updated memory entries.
-        """
+        """Add memory content from a file; user_id is stamped automatically."""
         # Validate the file before doing real work.
         file_path = Path(file_path)
         if not file_path.exists():
@@ -217,7 +199,6 @@ class LocalMemoryClient:
 
         return memory_entries
 
-
     def _process_file(self, file_path: Union[str, Path]) -> List[Segment]:
         """
         Process a file into segments using the processor registry.
@@ -243,24 +224,7 @@ class LocalMemoryClient:
         progress_callback: Optional[Callable[[int, int, str], None]] = None,  # for progress bar
         builder: Optional[Union[str, Type[MemoryBuilder], MemoryBuilder]] = None,
     ) -> List[MemoryEntry]:
-        """Add memory content; user_id is stamped automatically.
-
-        Args:
-            text: Text to add. Can be:
-                - str: Natural language text
-                - List[str]: Multiple text entries
-                - List[Dict[str, str]]: Structured context with key-value pairs
-            metadata: Additional metadata to store with the memory record
-            progress_callback: Optional callback for progress updates (current, total, message)
-            builder: Optional custom builder. Can be:
-                    - str: Builder type name (e.g., 'chat', 'markdown', 'doc')
-                    - Type[MemoryBuilder]: MemoryBuilder class to instantiate
-                    - MemoryBuilder: Custom MemoryBuilder instance
-                    - None: Use default builder
-
-        Returns:
-            Record ID (derived from key)
-        """
+        """Add memory content; user_id is stamped automatically."""
         if text is None:
             raise ValueError("Text must be provided")
 
@@ -370,20 +334,7 @@ class LocalMemoryClient:
         self,
         messages: List[NormalizedChatMessage],
     ) -> List[MemoryEntry]:
-        """Build memories from a chat/Teams thread.
-
-        Concatenates the messages into a single conversation, runs the chat
-        builder, and creates a source cue with full metadata (topic, sender,
-        recipients, dates).
-
-        Mirrors the structure of :meth:`add_emails`.
-
-        Args:
-            messages: List of chat messages in a single thread (chronological).
-
-        Returns:
-            List of MemoryEntry objects created.
-        """
+        """Build memories from a chat/Teams thread."""
         if not messages:
             return []
 
@@ -430,23 +381,7 @@ class LocalMemoryClient:
         top_k: int = 5,
         latency_tracker=None,
     ) -> List[MemoryEntry]:
-        """
-        Planner-driven retrieval pipeline for source-aware queries.
-
-        Uses FILTER, RESOLVE, and SEMANTIC_SEARCH primitives to support
-        sender/recipient filtering, document identification, and
-        hierarchical drill-down.
-
-        For simple semantic search, use query() instead.
-
-        Args:
-            context: Search context (str, List[str], or structured context)
-            top_k: Maximum results to return
-            latency_tracker: Optional latency tracker
-
-        Returns:
-            List of MemoryEntry objects
-        """
+        """Planner-driven retrieval pipeline for source-aware queries."""
         return self._megamem.planner_query(
             context,
             top_k=top_k,
@@ -464,24 +399,7 @@ class LocalMemoryClient:
         query_mode: Optional[QueryMode] = None,
         **kwargs,
     ):
-        """
-        Vector search to surface memories matching the supplied context.
-
-        Args:
-            context: Context to search for. Can be:
-                - str: Natural language query text
-                - List[str]: Multiple query strings
-                - List[Dict[str, str]]: Structured context with key-value pairs
-            k: Number of results to return
-            where: Filter conditions for metadata-based filtering
-            include: Fields to include in results (e.g., ["metadatas", "distances"])
-            enable_hybrid_search: Whether to enable hybrid search combining semantic + keyword search
-            enable_llm_filter: Whether to use LLM to filter irrelevant memories
-            query_mode: Query mode (ORIGINAL, PRIMARY_ONLY, CUE_ONLY, or BOTH)
-
-        Returns:
-            Backend-specific result object containing matching memories
-        """
+        """Vector search to surface memories matching the supplied context."""
         # Default the query mode from config when not explicitly set.
         if query_mode is None:
             query_mode = (
@@ -581,10 +499,6 @@ class LocalMemoryClient:
 
         self._megamem.delete_all(param)
 
-    # ------------------------------------------------------------------
-    # Source cue helpers (Phase 2)
-    # ------------------------------------------------------------------
-
     @staticmethod
     def _detect_data_type(text: str) -> str:
         """
@@ -606,20 +520,7 @@ class LocalMemoryClient:
 
     @staticmethod
     def _iso_to_unix(iso_str: str) -> int:
-        """
-        Convert an ISO timestamp string to a Unix timestamp (seconds).
-
-        Handles formats like:
-          - "2026-02-10T09:30:00Z"
-          - "2026-02-10T09:30:00+00:00"
-          - "2026-02-10" (date-only, midnight)
-
-        Args:
-            iso_str: ISO 8601 date/datetime string
-
-        Returns:
-            Unix timestamp as int, or 0 if parsing fails.
-        """
+        """Convert an ISO timestamp string to a Unix timestamp (seconds)."""
         try:
             if iso_str.endswith('Z'):
                 iso_str = iso_str[:-1] + '+00:00'
@@ -640,26 +541,7 @@ class LocalMemoryClient:
         metadata: Optional[Dict] = None,
         surviving_indices: Optional[List[str]] = None,
     ) -> Optional[str]:
-        """
-        Create a source-cue index linking every primary memory from a single source.
-
-        Called after memory extraction in add() and add_file(). Uses the
-        SourceCueGenerator to produce a natural-language source description
-        from structured metadata only (no body content), then persists via
-        AgentMemory.add_source_cue().
-
-        Args:
-            memory_entries: List of MemoryEntry objects created from this source
-            content: Raw content text — used ONLY for auto-detecting data_type
-                when not provided in metadata. NOT used for description generation.
-            metadata: Caller-supplied metadata dict, may contain:
-                - data_type: "mail" / "doc" / etc.
-                - sender / author / subject / title / date: source-specific fields
-                - source_ref: path or URI to the original source
-
-        Returns:
-            Record ID of the source cue entry, or None if skipped.
-        """
+        """Create a source-cue index linking every primary memory from a single source."""
         metadata = metadata or {}
 
         # Auto-detect data_type from the content headers when not supplied.
@@ -676,19 +558,6 @@ class LocalMemoryClient:
                 timestamp_unix = self._iso_to_unix(date_str)
                 logger.info(f"Auto-computed timestamp_unix: {timestamp_unix} from '{date_str}'")
 
-        # Pick the primary indices that actually live in the store.
-        # When surviving_indices is supplied (from upsert_memory_entry return values), we
-        # use those — they track the actual stored index even after merges/dedup.
-        # Otherwise we fall back to the original entry.index values.
-
-        # Why: the memory builder may merge a freshly extracted fact into an
-        # existing entry (deduplication). When that happens the returned
-        # MemoryEntry still carries the *original* candidate index, but only
-        # the *surviving* (merged-into) index actually exists in the store.
-        # Using memory_entries directly would therefore find nothing in the
-        # store, causing the source cue to be skipped entirely.
-        # surviving_indices tracks the final live index after any merge/dedup,
-        # so the source cue always links to real, queryable entries.
         if surviving_indices:
             primary_indices = list({
                 idx for idx in surviving_indices
@@ -735,13 +604,6 @@ class LocalMemoryClient:
         )
         return rid
 
-    # ------------------------------------------------------------------
-    # Per-data-type filterable-metadata extraction registry
-    # ------------------------------------------------------------------
-    # Each entry: (output_key, [candidate_input_keys], normalizer_func)
-    # normalizer_func: callable(str) → str, applied to the first non-empty match.
-    # New data type? Add an entry here.
-
     _FILTERABLE_FIELDS_REGISTRY: Dict[str, list] = {
         "mail": [
             ("sender",     ["sender", "from", "author"],    None),  # uses _normalize_sender
@@ -761,20 +623,7 @@ class LocalMemoryClient:
 
     @staticmethod
     def _extract_filterable_metadata(metadata: dict, data_type: str) -> dict:
-        """
-        Build the filterable metadata fields stored on a source cue.
-
-        Drives off _FILTERABLE_FIELDS_REGISTRY to extract and normalize fields
-        per data_type. Extensible: add a new data_type entry to the registry
-        dict to support additional source types.
-
-        Args:
-            metadata: Caller-supplied metadata dict
-            data_type: Source category ("mail", "doc", or "")
-
-        Returns:
-            Dict of normalized filterable fields
-        """
+        """Build the filterable metadata fields stored on a source cue."""
         filterable: Dict[str, Any] = {}
 
         field_specs = LocalMemoryClient._FILTERABLE_FIELDS_REGISTRY.get(data_type, [])
@@ -809,20 +658,7 @@ class LocalMemoryClient:
 
     @staticmethod
     def _normalize_sender(raw_sender: str) -> str:
-        """
-        Normalize a sender string for consistent $contains matching.
-
-        Handles common formats:
-          "Sarah Johnson <sarah.johnson@corp.com>" → "sarah johnson"
-          "sarah.johnson@corp.com"                 → "sarah johnson"
-          "Sarah J."                               → "sarah j."
-
-        Args:
-            raw_sender: Raw sender string from email metadata
-
-        Returns:
-            Lowercased, cleaned sender name
-        """
+        """Normalize a sender string for consistent $contains matching."""
         import re
         if not raw_sender:
             return ""

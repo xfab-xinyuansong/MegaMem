@@ -21,10 +21,6 @@ from megamem.builder.memory_builder import (
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Generic chat/Teams message data model (provider-agnostic)
-# ---------------------------------------------------------------------------
-
 @dataclass
 class NormalizedChatMessage:
     """Provider-agnostic chat/Teams message representation.
@@ -306,15 +302,7 @@ class ChatMemoryBuilder(MemoryBuilder):
         cue_indices: List[str],
         primary_index: str,
     ) -> List[str]:
-        """Clean LLM-generated cue indices and cap the list at 3.
-
-        Args:
-            cue_indices: Raw cue indices coming from the LLM.
-            primary_index: Primary memory index used for self-overlap checks.
-
-        Returns:
-            The deduped, validated cue indices.
-        """
+        """Clean LLM-generated cue indices and cap the list at 3."""
         validated: List[str] = []
         seen: set = set()
         primary_lower = primary_index.lower()

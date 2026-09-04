@@ -1,16 +1,4 @@
-"""
-Dual-query reformulation retrieval.
-
-Asks an LLM to rewrite the user's natural-language question into a
-keyword-style search query, then runs TWO searches — one with the rewritten
-form, one with the original — and merges the results.
-
-The dual pass exists because a single reformulation tends to drop evidence
-that the original phrasing surfaces. Empirically, top-5 Jaccard overlap
-between the two query forms is below 0.01, and roughly 38% of failures from
-single-pass plan-based retrieval came from the reformulation discarding
-the very phrasing that would have hit.
-"""
+"""Dual-query reformulation retrieval."""
 
 import logging
 import time
@@ -28,10 +16,6 @@ from megamem.utils.memory import dedup_memories
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Pydantic model
-# ---------------------------------------------------------------------------
-
 class ReformulatedQuery(BaseModel):
     """LLM-generated optimized search query."""
     search_query: str = Field(
@@ -45,10 +29,6 @@ class ReformulatedQuery(BaseModel):
         description="Brief explanation of how the query was reformulated."
     )
 
-
-# ---------------------------------------------------------------------------
-# Prompt
-# ---------------------------------------------------------------------------
 
 REFORMULATION_PROMPT = """\
 You are a search query optimizer for a personal memory database.
@@ -102,32 +82,8 @@ Produce the optimized search query.\
 """
 
 
-# ---------------------------------------------------------------------------
-# Retriever
-# ---------------------------------------------------------------------------
-
 class QueryReformulationRetriever(BaseMemoryRetriever):
-    """
-    Rewrite-then-search retriever using a dual-query merge.
-
-    Workflow: an LLM produces a keyword-flavoured rewrite of the user's
-    question, both the rewrite and the raw question are sent to the memory
-    store, and the two result lists are merged with deduplication.
-
-    Why bother running both queries?
-    --------------------------------
-    Failure analysis on plan-based retrieval revealed that a rewritten
-    question and the original question hit nearly disjoint memory sets —
-    Jaccard overlap below 0.01 in the top 5. In about 38% of failures, the
-    rewrite stripped the very phrasing that would have surfaced the
-    relevant memory. Running both keeps the BM25-friendliness of the
-    rewrite while preserving the natural-language semantics of the
-    original.
-
-    Example:
-        retriever = QueryReformulationRetriever(cfg, memory_client=megamem)
-        memories = retriever.retrieve("What is John's favorite food?", top_k=30)
-    """
+    """Rewrite-then-search retriever using a dual-query merge."""
 
     def __init__(
         self,
@@ -149,10 +105,6 @@ class QueryReformulationRetriever(BaseMemoryRetriever):
             self.query_mode = QueryMode.PRIMARY_ONLY
 
         self.last_trace: List[Dict] = []
-
-    # ------------------------------------------------------------------
-    # Query reformulation
-    # ------------------------------------------------------------------
 
     def _reformulate_query(
         self,
@@ -194,10 +146,6 @@ class QueryReformulationRetriever(BaseMemoryRetriever):
             )
             return query, f"fallback: reformulation failed ({exc})"
 
-    # ------------------------------------------------------------------
-    # Logging
-    # ------------------------------------------------------------------
-
     def _log_retrieval(
         self,
         query: str,
@@ -234,10 +182,6 @@ class QueryReformulationRetriever(BaseMemoryRetriever):
             block.append("  (none)")
         block.append(bar)
         logger.info("\n".join(block))
-
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
 
     def retrieve(
         self,

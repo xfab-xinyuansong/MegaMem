@@ -1,20 +1,4 @@
-"""MegaMem dual-view node schema and validator.
-
-Each hierarchy node carries both a lightweight distilled representation and a
-fuller detailed representation, plus the state needed for promotion and decay.
-
-``DualNode`` is the canonical node format. Integrations may add auxiliary fields
-under ``extra``, but the contract below must hold for every node.
-
-Validation invariants:
-  1. 100% of nodes have both distilled_text + detailed_text and their token counts.
-  2. >=95% of nodes have distilled_tokens < detailed_tokens.
-  3. 100% provenance traceability: every node carries source_evidence_ids that
-     can be resolved back to a real L0 entry.
-
-This module does NOT call any LLM. distilled_text generation lives in
-hierarchy_builder.py.
-"""
+"""MegaMem dual-view node schema and validator."""
 from __future__ import annotations
 
 import dataclasses
@@ -23,18 +7,9 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 
-# ---------------------------------------------------------------------------
-# Node state machine
-# ---------------------------------------------------------------------------
-
 NODE_STATE_LIGHT = "LIGHT"
 NODE_STATE_PROMOTED = "PROMOTED"
 VALID_NODE_STATES = {NODE_STATE_LIGHT, NODE_STATE_PROMOTED}
-
-
-# ---------------------------------------------------------------------------
-# DualNode dataclass
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -101,11 +76,6 @@ class DualNode:
             distilled_text_model_status=d.get("distilled_text_model_status", ""),
             extra=dict(d.get("extra", {}) or {}),
         )
-
-
-# ---------------------------------------------------------------------------
-# Validation
-# ---------------------------------------------------------------------------
 
 
 class DualNodeError(ValueError):
@@ -210,11 +180,6 @@ def validate_batch(nodes: List[DualNode]) -> Dict[str, Any]:
     }
 
 
-# ---------------------------------------------------------------------------
-# Convenience helpers
-# ---------------------------------------------------------------------------
-
-
 def write_nodes_jsonl(nodes: List[DualNode], path: str) -> None:
     with open(path, "w") as f:
         for n in nodes:
@@ -229,11 +194,6 @@ def read_nodes_jsonl(path: str) -> List[DualNode]:
             if ln:
                 out.append(DualNode.from_dict(json.loads(ln)))
     return out
-
-
-# ---------------------------------------------------------------------------
-# Self-test
-# ---------------------------------------------------------------------------
 
 
 def _self_test() -> int:

@@ -126,19 +126,7 @@ class ChromaDBClient(VectorDBClient):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Read records back from a ChromaDB collection.
-
-        Args:
-            collection: ChromaDB collection handle.
-            ids: optional whitelist of record ids.
-            where: optional filter clause.
-            include: fields to return.
-            limit: maximum number of returned records.
-            offset: skip this many records before returning.
-
-        Returns:
-            ChromaDB result dictionary.
-        """
+        """Read records back from a ChromaDB collection."""
         return collection.get(
             ids=ids,
             where=where,

@@ -48,20 +48,7 @@ class HttpMemoryStore(MemoryBase):
         self.collection_name = cfg.memory.collection_name
 
     def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict[str, Any]:
-        """
-        Issue an HTTP request to the remote memory service.
-
-        Args:
-            method: HTTP verb (GET, POST, PUT, DELETE)
-            endpoint: API path
-            data: Request payload
-
-        Returns:
-            Response data as a dict
-
-        Raises:
-            Exception: If the request fails
-        """
+        """Issue an HTTP request to the remote memory service."""
         url = urljoin(self.base_url, endpoint)
 
         try:
@@ -136,21 +123,7 @@ class HttpMemoryStore(MemoryBase):
         where: Optional[Where] = None,
         include: Optional[List[str]] = None,
     ):
-        """
-        Vector search to surface memories similar to the given context.
-
-        Args:
-            context: Context to search for. Can be:
-                - str: Natural language query text
-                - List[str]: Multiple query strings
-                - List[Dict[str, str]]: Structured context with key-value pairs
-            k: Number of results to return
-            where: Filter conditions for metadata-based filtering
-            include: Fields to include in results (e.g., ["metadatas", "distances"])
-
-        Returns:
-            Query result dict matching the ChromaDB shape
-        """
+        """Vector search to surface memories similar to the given context."""
         include = include or ["metadatas", "distances"]
 
         # Coerce the various accepted context shapes into a single query string.

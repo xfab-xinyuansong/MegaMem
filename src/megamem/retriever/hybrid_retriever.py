@@ -1,19 +1,4 @@
-"""
-Hybrid retrieval: reformulation + on-demand decomposition.
-
-A single LLM call both rewrites the user's question into an optimised
-search query and decides whether multi-step decomposition is required.
-The retriever always performs a dual-pass search (rewritten + original);
-when the LLM flags the question as containing an indirect reference that
-must first be resolved, it additionally executes a plan-based
-decomposition and merges those results.
-
-The point is to let the LLM — not a heuristic — judge complexity, and to
-combine the strengths of both strategies:
-- Reformulation + dual-pass for evidence recall on simple/temporal queries.
-- Plan decomposition for genuinely multi-hop queries with indirect
-  entity references.
-"""
+"""Hybrid retrieval: reformulation + on-demand decomposition."""
 
 import json
 import logging
@@ -36,10 +21,6 @@ from megamem.utils.memory import dedup_memories, merge_with_rrf
 
 logger = logging.getLogger(__name__)
 
-
-# ---------------------------------------------------------------------------
-# Pydantic model
-# ---------------------------------------------------------------------------
 
 class HybridQueryResult(BaseModel):
     """Combined reformulation + optional decomposition output."""
@@ -106,11 +87,6 @@ class PostFilterResponse(BaseModel):
     )
 
 
-
-# ---------------------------------------------------------------------------
-# Cue-scan prompt — fed the complete cue inventory for a user
-# ---------------------------------------------------------------------------
-
 CUE_SCAN_PROMPT = """\
 You are a cognitive memory retrieval specialist. You receive:
 1. A user's statement or question (the TRIGGER).
@@ -152,10 +128,6 @@ Select the relevant cue indices.\
 """
 
 
-# ---------------------------------------------------------------------------
-# Post-filter prompt — cognitive relevance scoring
-# ---------------------------------------------------------------------------
-
 POST_FILTER_PROMPT = """\
 You are a cognitive relevance judge for a personal memory system.
 
@@ -196,10 +168,6 @@ A memory is relevant when it links to the trigger through ANY of:
 Score all memories.\
 """
 
-
-# ---------------------------------------------------------------------------
-# Prompt
-# ---------------------------------------------------------------------------
 
 HYBRID_PROMPT = """\
 You are a search query optimizer and decomposition planner for a personal \
@@ -306,34 +274,8 @@ rephrase the original. Keep each expansion between 3 and 12 words.
 """
 
 
-# ---------------------------------------------------------------------------
-# Retriever
-# ---------------------------------------------------------------------------
-
 class HybridRetriever(BaseMemoryRetriever):
-    """
-    Single-LLM-call retriever that fuses query reformulation with
-    on-demand plan-based decomposition.
-
-    Flow
-    ----
-    1. One LLM call yields: optimised ``search_query`` + the
-       decomposition decision.
-    2. Always: dual-query search (rewritten + original) merged with
-       deduplication.
-    3. If ``needs_decomposition`` is set: also run the plan steps via a
-       composed ``PlanBasedRetriever`` and fold those memories in too.
-
-    Cost model
-    ----------
-    - Simple queries (~93%): 1 LLM call + 2 searches.
-    - Complex queries (~7%): 1 LLM call + 2 searches + N step searches +
-      (N-1) extraction LLM calls.
-
-    Example:
-        retriever = HybridRetriever(cfg, memory_client=megamem)
-        memories = retriever.retrieve("The team lead's favorite food", top_k=30)
-    """
+    """Single-LLM-call retriever that fuses query reformulation with"""
 
     def __init__(
         self,
@@ -369,10 +311,6 @@ class HybridRetriever(BaseMemoryRetriever):
         self._cue_cache: Optional[List[MemoryEntry]] = None
 
         self.last_trace: List[Dict] = []
-
-    # ------------------------------------------------------------------
-    # LLM analysis
-    # ------------------------------------------------------------------
 
     def _analyze_query(
         self,
@@ -445,10 +383,6 @@ class HybridRetriever(BaseMemoryRetriever):
                 needs_decomposition=False,
                 steps=[],
             )
-
-    # ------------------------------------------------------------------
-    # Cue-scan: LLM-over-all-cues retrieval
-    # ------------------------------------------------------------------
 
     def _get_cue_inventory(self) -> List[MemoryEntry]:
         """Lazily fetch and cache every cue entry for the current memory store."""
@@ -545,10 +479,6 @@ class HybridRetriever(BaseMemoryRetriever):
         )
         return resolved
 
-    # ------------------------------------------------------------------
-    # Post-filter: LLM-based cognitive relevance scoring
-    # ------------------------------------------------------------------
-
     def _post_filter(
         self,
         trigger: str,
@@ -587,9 +517,6 @@ class HybridRetriever(BaseMemoryRetriever):
 
             score_map = {item.index: item.score for item in response.scores}
 
-            # Keep memories scoring at least 2 (strong / plausible link).
-            # Stamp the cognitive relevance score onto each entry so
-            # downstream highlighting can distinguish 3 vs 2.
             kept: List[MemoryEntry] = []
             for entry in memories:
                 llm_score = score_map.get(entry.index, 2)  # default keep when missing
@@ -608,10 +535,6 @@ class HybridRetriever(BaseMemoryRetriever):
                 f"Post-filter failed: {exc}. Returning all memories unfiltered."
             )
             return memories
-
-    # ------------------------------------------------------------------
-    # Logging
-    # ------------------------------------------------------------------
 
     def _log_retrieval(
         self,
@@ -652,10 +575,6 @@ class HybridRetriever(BaseMemoryRetriever):
             block.append("  (none)")
         block.append(bar)
         logger.info("\n".join(block))
-
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
 
     def retrieve(
         self,

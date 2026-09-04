@@ -1,31 +1,4 @@
-"""
-Option E (combined distilled+cognitive prompt) quality preflight.
-
-before committing to Option E at 60M scale, run a
-10-doc comparison that measures:
-- distilled memory count parity (combined ≥ 0.8 × separate)
-- cognitive relation count parity (combined ≥ 0.8 × separate)
-- 14-type cognitive coverage parity (combined coverage ≥ separate coverage − 2 types)
-- per-type distribution KL/JS divergence on cognitive memory_type
-
-Pass criteria (FAIL if any below; default values chosen conservatively):
-  - distilled_count_ratio >= 0.80  (combined produces at least 80% of distilled per chunk)
-  - cognitive_count_ratio >= 0.80
-  - cognitive_type_coverage_loss <= 2  (no more than 2 types disappear vs separate)
-  - per-type max relative drop <= 0.50  (no single type drops by more than 50%)
-
-Outputs:
-- experiments/stage2_option_e_preflight/results.json — raw counts + verdict
-- prints PASS/FAIL summary to stdout
-
-Usage (on compute-node OR locally):
-    python -m megamem.document_eval.option_e_preflight \
-        --docs-parquet /path/to/docs.parquet \
-        --tier-manifest /path/to/tier_0M_doc_ids.parquet \
-        --n-docs 10 \
-        --output-dir /path/to/experiments/stage2_option_e_preflight \
-        --chat-model YOUR_CHAT_MODEL
-"""
+"""Option E (combined distilled+cognitive prompt) quality preflight."""
 from __future__ import annotations
 
 import argparse

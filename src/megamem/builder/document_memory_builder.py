@@ -141,7 +141,6 @@ class DocumentMemoryBuilder(MemoryBuilder):
     def __init__(self, cfg: DictConfig, megamem: AgentMemory, model_client: ChatCompletionModel):
         super().__init__(cfg, megamem, model_client)
             
-
     def build_memory_entries(
         self, content: Union[str, Dict], metadata: Optional[Dict]
     ) -> List[MemoryEntry]:
@@ -202,19 +201,7 @@ class DocumentMemoryBuilder(MemoryBuilder):
         content: Optional[Union[str, Dict]],
         metadata: Optional[Dict],
     ) -> Optional[MemoryEntry]:
-        """Build a Document-level episodic summary via the LLM.
-
-        plan.md §4 maps "Conversation -> Document" and "Episodic Memory -> Document
-        Summary". This implementation mirrors EmailMemoryBuilder.generate_episodic_memory
-        but uses a document-summary prompt.
-
-        Args:
-            content: Document segment payload (text or normalized multimodal dict).
-            metadata: Extra metadata to attach to the resulting episodic entry.
-
-        Returns:
-            A new episodic ``MemoryEntry`` or ``None`` if extraction failed.
-        """
+        """Build a Document-level episodic summary via the LLM."""
         try:
             # After normalize_content the payload is either a string or a dict with
             # a "text" field; pick the textual portion either way.

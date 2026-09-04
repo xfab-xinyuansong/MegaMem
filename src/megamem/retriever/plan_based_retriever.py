@@ -1,24 +1,4 @@
-"""
-Plan-based memory retrieval.
-
-Breaks a complex user query into a sequence of sub-queries where later steps
-may depend on the answers extracted from earlier ones, then runs them
-against the memory store.
-
-Notable design points:
-- Only "leaf" steps (those nothing else depends on) contribute memories to
-  the final result. Intermediate "pointer" steps exist purely to resolve
-  chained references — their answer is extracted and substituted into
-  later step queries.
-- Independent multi-step plans (no inter-step dependencies) are folded into
-  a single direct search to avoid wasting queries on near-duplicates.
-- A pointer step that yields ``UNKNOWN`` does NOT abort the plan; instead,
-  the original entity reference is substituted as a degraded fallback and
-  execution continues (confidence gating).
-- A pointer step that fails outright (exception or zero hits) aborts the
-  current plan and triggers re-planning, up to ``max_plan_retries`` times.
-  After that the retriever falls back to a single direct search.
-"""
+"""Plan-based memory retrieval."""
 
 import logging
 import re
@@ -38,10 +18,6 @@ logger = logging.getLogger(__name__)
 
 _UNKNOWN = "UNKNOWN"
 
-
-# ---------------------------------------------------------------------------
-# Pydantic models
-# ---------------------------------------------------------------------------
 
 class PlanStep(BaseModel):
     """A single step in the decomposed retrieval plan."""
@@ -80,10 +56,6 @@ class StepAnswer(BaseModel):
     )
     confidence: float = Field(default=1.0, description="Confidence 0.0-1.0.")
 
-
-# ---------------------------------------------------------------------------
-# Prompts
-# ---------------------------------------------------------------------------
 
 PLAN_GENERATION_PROMPT = """\
 You are a query decomposition planner for a memory retrieval system.
@@ -207,51 +179,8 @@ INSTRUCTIONS:
 """
 
 
-# ---------------------------------------------------------------------------
-# Retriever
-# ---------------------------------------------------------------------------
-
 class PlanBasedRetriever(BaseMemoryRetriever):
-    """
-    Retriever that plans a sequence of dependent sub-queries.
-
-    The LLM produces a small plan (1–4 steps); answers from earlier steps
-    feed into the queries of later steps via ``{step_id}`` placeholders.
-    Each step is then run against the memory store in turn.
-
-    Plan optimisation
-    -----------------
-    Once the plan is generated, plans whose steps share no dependencies
-    are collapsed into a single direct search. Independent parallel
-    sub-queries hit overlapping semantic space anyway, so a single search
-    over the original query is just as good for less cost.
-
-    Memory collection strategy
-    --------------------------
-    Only memories from leaf steps (no other step depends on them) end up
-    in the final result. Intermediate "pointer" steps (``has_dependents``)
-    exist solely to resolve chained references — the extracted answer is
-    what we actually need from them, so their raw memories are dropped.
-
-    Confidence gating
-    -----------------
-    A pointer step that extracts ``UNKNOWN`` does not hard-fail the plan.
-    The original entity reference from the user query is substituted as
-    a degraded fallback, and the pointer's memories are added to the leaf
-    pool to avoid losing context. Hard failures are reserved for actual
-    exceptions or zero retrieved memories.
-
-    Error handling / re-planning
-    ----------------------------
-    If an intermediate step does fail, the plan is aborted and a new plan
-    is generated with the failure context fed back into the prompt. This
-    retry loop runs up to ``max_plan_retries`` times; after that, the
-    retriever falls back to a single direct search.
-
-    Example:
-        retriever = PlanBasedRetriever(cfg, memory_client=megamem)
-        memories = retriever.retrieve("Your manager's favorite food", top_k=10)
-    """
+    """Retriever that plans a sequence of dependent sub-queries."""
 
     def __init__(
         self,
@@ -277,10 +206,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
             self.query_mode = QueryMode.PRIMARY_ONLY
 
         self.last_trace: List[Dict] = []
-
-    # ------------------------------------------------------------------
-    # Plan generation
-    # ------------------------------------------------------------------
 
     def _log_plan(self, plan: QueryPlan, query: str, attempt: int) -> None:
         """Emit a verbose log of the plan to aid debugging."""
@@ -397,10 +322,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
                 reasoning=f"Fallback: plan generation failed ({exc})",
             )
 
-    # ------------------------------------------------------------------
-    # Plan optimisation
-    # ------------------------------------------------------------------
-
     @staticmethod
     def _collapse_independent_steps(plan: QueryPlan, original_query: str) -> QueryPlan:
         """
@@ -441,10 +362,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
                 f"Original reasoning: {plan.reasoning}"
             ),
         )
-
-    # ------------------------------------------------------------------
-    # Answer extraction
-    # ------------------------------------------------------------------
 
     def _extract_answer(
         self,
@@ -497,10 +414,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
             logger.error(f"Answer extraction failed: {exc}")
             return _UNKNOWN, 0.0
 
-    # ------------------------------------------------------------------
-    # Query substitution
-    # ------------------------------------------------------------------
-
     @staticmethod
     def _substitute_placeholders(template: str, resolved: Dict[str, str]) -> str:
         """Swap ``{S1}``, ``{S2}`` … placeholders for the resolved answer strings."""
@@ -508,10 +421,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
         for step_id, answer in resolved.items():
             rendered = rendered.replace("{" + step_id + "}", answer)
         return rendered
-
-    # ------------------------------------------------------------------
-    # Plan execution
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _extract_entity_from_query(original_query: str, step_query: str) -> str:
@@ -540,37 +449,7 @@ class PlanBasedRetriever(BaseMemoryRetriever):
         latency_tracker,
         original_query: str = "",
     ) -> Tuple[List[MemoryEntry], Optional[str], Optional[str]]:
-        """
-        Run every step of ``plan`` in order.
-
-        Returns
-        -------
-        (memories, failed_step_id, failure_reason)
-            memories:        final deduplicated memories on success (empty list on failure).
-            failed_step_id:  step_id of the first failing step, or None on success.
-            failure_reason:  human-readable failure description, or None on success.
-
-        Failure conditions (only for intermediate / pointer steps)
-        ----------------------------------------------------------
-        - Exception raised during memory query
-        - Zero memories retrieved  (cannot resolve chain reference)
-
-        Confidence gating
-        -----------------
-        When a pointer step extracts UNKNOWN, instead of hard-failing, the
-        plan continues with the original entity reference from the query as
-        the substitution value. The pointer step's memories are also added
-        to the leaf pool to avoid losing relevant context.
-
-        Memory collection strategy
-        --------------------------
-        Only memories from leaf steps are included in the final result.
-        Pointer steps contribute their answer via extraction; the raw memories
-        from pointer steps are intentionally excluded because the extracted answer
-        already captures the needed information and including the raw memories
-        would add noise focused on the pointer resolution rather than the
-        original question.
-        """
+        """Run every step of ``plan`` in order."""
         # Pre-compute the set of step ids that have at least one dependent.
         step_ids_with_dependents: set = {
             s.depends_on for s in plan.steps if s.depends_on
@@ -713,10 +592,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
         if latency_tracker:
             latency_tracker.add_retrieval_step(step_data)
 
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
-
     def retrieve(
         self,
         query: str,
@@ -729,20 +604,7 @@ class PlanBasedRetriever(BaseMemoryRetriever):
         latency_tracker=None,
         **kwargs,
     ) -> List[MemoryEntry]:
-        """
-        Retrieve memories using plan-based decomposition with automatic
-        re-planning on intermediate-step failures.
-
-        Retry loop
-        ----------
-        1. Generate a plan (first attempt: standard prompt; retries: retry
-           prompt with failure context to push the LLM toward a different
-           strategy).
-        2. Execute the plan; if an intermediate step fails, abort the plan
-           and try again.
-        3. Once ``max_plan_retries`` is exhausted, fall back to a single
-           direct search.
-        """
+        """Retrieve memories using plan-based decomposition with automatic"""
         self.last_trace = []
 
         if top_k is None:
@@ -802,9 +664,7 @@ class PlanBasedRetriever(BaseMemoryRetriever):
             )
 
             if failed_step_id is None:
-                # When the plan had multiple steps, top up the result with
-                # a direct search on the original query — recovers
-                # evidence that decomposition may have skipped over.
+
                 if len(plan.steps) > 1:
                     try:
                         supplement = self.memory_client.query(

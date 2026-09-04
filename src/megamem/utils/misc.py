@@ -20,35 +20,7 @@ def normalize_content(
     content: Union[str, List[str], List[Dict[str, Any]]],
     multimodal_support: bool = True,
 ):
-    """Normalise heterogeneous context input into a uniform shape.
-
-    Handles plain text, lists of strings and conversation/multimodal
-    message lists, and produces a dict suitable for downstream consumers.
-
-    Args:
-        content: input in any of the supported shapes:
-            - ``str``: a single text blob.
-            - ``List[str]``: several strings to concatenate.
-            - ``List[Dict]``: chat-style messages, possibly with
-              embedded multimodal content parts.
-        multimodal_support: when ``True`` and image parts are present,
-            the returned dict includes an ``image`` key.
-
-    Returns:
-        Text-only payload::
-
-            {"text": "User: Hello\\nAssistant: Hi there!"}
-
-        Multimodal payload (when supported and present)::
-
-            {
-                "text": "...",
-                "image": [{"type": "image_url", ...}],
-            }
-
-    Raises:
-        ValueError: when the content shape isn't supported.
-    """
+    """Normalise heterogeneous context input into a uniform shape."""
     text_parts: List[str] = []
     image_parts: List[Dict[str, Any]] = []
 
@@ -123,15 +95,6 @@ def add_and_condition(where: Optional[dict], new_condition: dict) -> dict:
     return {"$and": [where, new_condition]}
 
 
-# def get_current_timestamp() -> str:
-#     """
-#     Get the current timestamp as a formatted string.
-#
-#     Returns:
-#         Current timestamp in ISO format (YYYY-MM-DD HH:MM:SS)
-#     """
-#     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
 def get_current_timestamp() -> str:
     """Current local time formatted as ``YYYY-MM-DD HH:MM:SS``.
 
@@ -183,9 +146,6 @@ def merge_metadata(
     return merged
 
 
-# -----------------------------------------------------------------------------
-# Helper Functions
-# -----------------------------------------------------------------------------
 def extension_to_type(extension: str) -> str:
     """Translate a file extension into a memory-builder file-type tag.
 

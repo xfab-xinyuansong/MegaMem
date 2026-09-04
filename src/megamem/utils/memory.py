@@ -15,21 +15,7 @@ def merge_with_rrf(
     weights: Optional[List[float]] = None,
     k: int = 60,
 ) -> List[MemoryEntry]:
-    """Fuse ranked memory lists using weighted Reciprocal Rank Fusion.
-
-    For every entry ``d``, the RRF score is::
-
-        RRF_score(d) = sum_i weight_i / (k + rank_i(d))
-
-    summed over the lists in which ``d`` appears. Scores are min-max
-    normalised to ``[0, 1]`` and stored on each entry's ``score`` field;
-    the returned list is sorted from highest to lowest score.
-
-    Args:
-        result_lists: ranked candidate lists from different retrievers.
-        weights: per-list weights; defaults to ``1.0`` for every list.
-        k: smoothing constant in the RRF formula (default 60).
-    """
+    """Fuse ranked memory lists using weighted Reciprocal Rank Fusion."""
     if weights is None:
         weights = [1.0] * len(result_lists)
     if len(weights) != len(result_lists):
@@ -97,26 +83,7 @@ class MemoryUpdateDecision(BaseModel):
 
 
 def combine_list(list_string1: str, list_string2: str, delimiter: str = "||") -> str:
-    """Merge two delimited "list-as-string" values, removing duplicates.
-
-    Empty pieces and exact duplicates are dropped while order is otherwise
-    irrelevant (a ``set`` is used internally).
-
-    Args:
-        list_string1: first delimited list (may be empty).
-        list_string2: second delimited list (may be empty).
-        delimiter: token used to split/join the two strings (default "||").
-
-    Returns:
-        The merged delimited string, or "" when both inputs are empty.
-
-    Examples:
-        combine_list("item1", "item2") -> "item1||item2"
-        combine_list("item1||item2", "item3") -> "item1||item2||item3"
-        combine_list("", "item1") -> "item1"
-        combine_list("item1", "") -> "item1"
-        combine_list("item1||item2", "item1||item3") -> "item1||item2||item3"
-    """
+    """Merge two delimited "list-as-string" values, removing duplicates."""
     if not list_string1 and not list_string2:
         return ""
     if not list_string1:
@@ -288,21 +255,7 @@ def format_memories_to_str(
 
 
 def dedup_memories(memories: List[MemoryEntry]) -> List[MemoryEntry]:
-    """Deduplicate memories by their ``index``, keeping the first occurrence.
-
-    Entries without an ``index`` are kept verbatim (they normally shouldn't
-    occur in well-formed data).
-
-    Args:
-        memories: possibly duplicated entries.
-
-    Returns:
-        List with duplicates removed in original order.
-
-    Example:
-        memories = [entry1, entry2, entry1, entry3]  # entry1 appears twice
-        unique_memories = dedup(memories)  # Returns [entry1, entry2, entry3]
-    """
+    """Deduplicate memories by their ``index``, keeping the first occurrence."""
     seen: set = set()
     unique: List[MemoryEntry] = []
 

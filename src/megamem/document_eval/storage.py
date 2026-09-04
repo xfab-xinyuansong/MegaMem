@@ -1,17 +1,4 @@
-"""
-ChromaDB storage wrapper for document_eval.
-
-Each "kind" of entry lives in its own ChromaDB collection. Collection names
-all contain "_doc_" so that LoCoMo (which uses different naming) is physically
-isolated.
-
-Kinds:
-- raw_chunks (DDI Stream A, also HDM Layer 4, also CDM source backref)
-- distilled_memory (DDI Stream B)
-- cognitive (CDM)
-- section_summaries (HDM Layer 3)
-- doc_summaries (HDM Layer 2)
-"""
+"""ChromaDB storage wrapper for document_eval."""
 from __future__ import annotations
 
 import logging

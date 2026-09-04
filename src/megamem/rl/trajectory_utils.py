@@ -1,18 +1,4 @@
-"""
-Trajectory collector for GRPO-style retrieval learning.
-
-Models retrieval as Policy-Guided Sequential Retrieval. The action space
-covers (subset currently active):
-
-    a) QUERY_CUE_INDEX        — query the cue index
-    b) QUERY_PRIMARY_INDEX    — query the primary index
-    c) PROPAGATE_PRIMARY_TO_CUE
-    d) PROPAGATE_CUE_TO_CUE
-    e) REFORMULATE_QUERY
-    f) STOP                   — terminate retrieval
-
-State per step: ``(query, retrieved_memories, frontier, budget)``.
-"""
+"""Trajectory collector for GRPO-style retrieval learning."""
 
 from __future__ import annotations
 
@@ -38,9 +24,6 @@ class ActionType(Enum):
     QUERY_PRIMARY_INDEX = "query_primary"
     QUERY_CUE_INDEX = "query_cue"
 
-    # PROPAGATE_PRIMARY_TO_CUE = "propagate_primary_to_cue"
-    # PROPAGATE_CUE_TO_PRIMARY = "propagate_cue_to_primary"
-    # REFORMULATE_QUERY = "reformulate"
     STOP = "stop"
 
 
@@ -50,9 +33,6 @@ ACTION_COSTS = {
     ActionType.QUERY_PRIMARY_INDEX: 1.0,
     ActionType.QUERY_CUE_INDEX: 1.0,
 
-    # ActionType.PROPAGATE_PRIMARY_TO_CUE: 0.5,
-    # ActionType.PROPAGATE_CUE_TO_PRIMARY: 0.5,
-    # ActionType.REFORMULATE_QUERY: 0.2,
     ActionType.STOP: 0.0,
 }
 
@@ -299,19 +279,7 @@ class TrajectoryCollector:
             temperature: float = 0.0,
             policy_network=None,
     ) -> Trajectory:
-        """
-        Roll out one trajectory for ``query``.
-
-        Args:
-            query: The question q
-            user_id: User ID for memory lookup
-            ground_truth: Expected Answer (for evaluation)
-            evidence: Ground truth evidence memories
-            temperature: Sampling temperature (0=greedy, >0=stochastic)
-
-        Returns:
-            Fully populated :class:`Trajectory`.
-        """
+        """Roll out one trajectory for ``query``."""
         client = self.get_client(user_id)
 
         state = RetrievalState(
@@ -450,7 +418,6 @@ class TrajectoryCollector:
         exps = [math.exp(s - max_s) for s in scaled]
         total = sum(exps)
         return [e / total for e in exps]
-
 
     '''
     # Might Use in Future Implementation (if going with dynamic frontier)

@@ -22,23 +22,7 @@ def log_segments(segments: Segment) -> None:
 
 
 def configure_logging(log_level: str = "INFO", log_dir: Optional[str] = None):
-    """Configure root logging for the application.
-
-    Both a console handler (always) and an optional file handler (when
-    ``log_dir`` is supplied) are installed. A few noisy third-party
-    libraries are also dialled down to WARNING.
-
-    Args:
-        log_level: textual logging level (DEBUG/INFO/WARNING/ERROR/CRITICAL).
-        log_dir: when provided, a timestamped ``run_<ts>.log`` file is
-            written under this directory (created if missing). The console
-            handler is installed in addition, so output keeps appearing in
-            the terminal.
-
-    Returns:
-        Path to the created log file, or ``None`` when no ``log_dir`` was
-        given.
-    """
+    """Configure root logging for the application."""
     import os
     from datetime import datetime
 
@@ -83,20 +67,7 @@ def log_memory_operation(
     entry: MemoryEntry,
     user_id: str,
 ) -> None:
-    """Emit a uniformly formatted log entry for a memory-store operation.
-
-    Centralising the formatting here keeps add/update/delete log output
-    consistent across the codebase and makes downstream parsing easier.
-
-    The emitted block contains a horizontal-rule separator, the operation
-    type along with timestamp and user, and the entry's index/value/cue
-    fields.
-
-    Args:
-        operation_type: human label for the operation (Add, Update, ...).
-        entry: the ``MemoryEntry`` being processed.
-        user_id: identifier of the user owning the entry.
-    """
+    """Emit a uniformly formatted log entry for a memory-store operation."""
     log_message = (
         "\n" + "-" * 60 + "\n"
         f"MEMORY STORE: {operation_type}|{entry.creation_time}|{user_id}\n"
@@ -109,25 +80,3 @@ def log_memory_operation(
     log_message += "-" * 60
 
     logger.info(log_message)
-
-
-# def memory_store_log_add(logger, index: str, value: str, metadata: dict):
-#     logger = logging.getLogger(__name__)
-#     logger.info(
-#         "\n" + "=" * 60 + "\n"
-#         f"MEMORY STORE: Add|{metadata.get('timestamp', 'N/A')}|{metadata.get('user_id', 'N/A')}\n"
-#         f"Index: {index}\n"
-#         f"Value: {value}\n" + "=" * 60
-#     )
-
-
-# def memory_store_log_update(
-#     logger, old_index: str, new_index: str, new_value: str, metadata: dict
-# ):
-#     logger = logging.getLogger(__name__)
-#     logger.info(
-#         "\n" + "=" * 60 + "\n"
-#         f"MEMORY STORE: Update|{metadata.get('timestamp', 'N/A')}|{metadata.get('user_id', 'N/A')}\n"
-#         f"Index: {old_index} -> {new_index}\n"
-#         f"Update Value: {new_value}\n" + "=" * 60
-#     )

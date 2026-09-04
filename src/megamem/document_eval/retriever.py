@@ -25,10 +25,6 @@ from megamem.document_eval.types import DocumentRetrievalConfig
 logger = logging.getLogger(__name__)
 
 
-# --------------------------------------------------------------------------
-# Relation expansion adjacency for cognitive retrieval
-# --------------------------------------------------------------------------
-
 # Maps each source memory type to depth-one expansion targets.
 RELATION_ADJACENCY: Dict[str, List[str]] = {
     "constraint": ["exception", "requirement", "decision", "dependency", "risk", "conflict", "version_update"],
@@ -47,10 +43,6 @@ RELATION_ADJACENCY: Dict[str, List[str]] = {
     "example": ["fact", "definition"],
 }
 
-
-# --------------------------------------------------------------------------
-# Query intent → primary cognitive types
-# --------------------------------------------------------------------------
 
 QUERY_INTENT_KEYWORDS: List[Tuple[List[str], List[str]]] = [
     (["can i", "am i allowed", "is it permitted", "allowed to", "permitted"],
@@ -86,11 +78,6 @@ def classify_query_intent(query: str) -> Tuple[List[str], List[str]]:
     return ["fact", "definition"], ["recommendation", "example"]
 
 
-# --------------------------------------------------------------------------
-# RRF helper
-# --------------------------------------------------------------------------
-
-
 def reciprocal_rank_fusion(
     ranked_lists: List[List[Tuple[str, float, Dict[str, Any]]]],
     weights: Optional[List[float]] = None,
@@ -113,11 +100,6 @@ def reciprocal_rank_fusion(
                 payload_by_id[_id] = payload
     sorted_ids = sorted(fused.keys(), key=lambda i: -fused[i])
     return [(i, fused[i], payload_by_id[i]) for i in sorted_ids]
-
-
-# --------------------------------------------------------------------------
-# Retriever
-# --------------------------------------------------------------------------
 
 
 @dataclass
@@ -295,10 +277,6 @@ class DocumentRetriever:
         result.trace = trace
         result.retrieval_seconds = time.time() - t0
         return result
-
-    # ----------------------------------------------------------------------
-    # internal helpers
-    # ----------------------------------------------------------------------
 
     def _route_documents(self, query: str, top_k: int) -> List[str]:
         ranked = self._query_collection("doc_summaries", query=query, n_results=top_k)

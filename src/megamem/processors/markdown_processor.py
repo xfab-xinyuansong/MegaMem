@@ -181,20 +181,7 @@ class MarkdownProcessor(FileProcessor):
         current_heading_level: int,
         heading_hierarchy: dict,
     ) -> dict:
-        """Merge heading-related fields into ``metadata``.
-
-        When no heading is active, dummy values are used so the metadata
-        schema stays consistent across all segments.
-
-        Args:
-            metadata: Base metadata to update.
-            current_heading: Heading text (or ``None``).
-            current_heading_level: Heading level (or ``None``).
-            heading_hierarchy: Active heading hierarchy snapshot.
-
-        Returns:
-            The updated metadata dict.
-        """
+        """Merge heading-related fields into ``metadata``."""
         if current_heading:
             heading_path = self._build_heading_path(
                 heading_hierarchy, current_heading_level

@@ -134,19 +134,7 @@ class LLMPolicy:
         primary_candidates: List[MemoryEntry],
         cue_candidates: List[MemoryEntry],
     ) -> str:
-        """
-        Render the candidate actions as a numbered list for the LLM.
-
-        Example::
-
-            "1. [PRIMARY] Jolene electricity engineering project
-                Content: Jolene mentioned she is working on an electricity...
-            2. [PRIMARY] Deborah career counseling
-                Content: Deborah gave advice about career paths...
-            3. [CUE] engineering work
-                Links to memories about this topic
-            STOP. Stop retrieval (enough information gathered)"
-        """
+        """Render the candidate actions as a numbered list for the LLM."""
 
         lines: list = []
         action_idx = 1

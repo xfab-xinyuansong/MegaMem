@@ -92,27 +92,7 @@ Constraints:
 """
 
 class PromptedPolicyRetriever(BaseMemoryRetriever):
-    """
-    Multi-step retriever driven by an LLM-prompted control policy.
-
-    After an initial semantic lookup, an LLM repeatedly inspects the
-    Working Set / Frontier and chooses one of three actions — EXPAND
-    (pull in linked memories), RE_QUERY (search again with a refined
-    query), or STOP (done).
-
-    Used as a **baseline** to benchmark RL-trained retrieval policies
-    against a well-prompted LLM policy.
-
-    Capabilities:
-    - Initial semantic retrieval
-    - Frontier expansion via memory links
-    - LLM-guided action selection (EXPAND/RE_QUERY/STOP)
-    - Configurable max steps
-
-    Example:
-        retriever = PromptedPolicyRetriever(cfg, memory_client=megamem)
-        memories = retriever.retrieve("What project is Jolene working on?", top_k=10)
-    """
+    """Multi-step retriever driven by an LLM-prompted control policy."""
 
     def __init__(
         self, 
@@ -202,7 +182,6 @@ class PromptedPolicyRetriever(BaseMemoryRetriever):
                 expanded_memories.extend(linked_memories)
         return expanded_memories
 
-
     def _format_working_set(self, memories: List[MemoryEntry]) -> str:
         """Render the working set as a numbered, length-capped list for the prompt."""
         if not memories:
@@ -218,7 +197,6 @@ class PromptedPolicyRetriever(BaseMemoryRetriever):
 
         return "\n".join(rows)
 
-
     def _format_frontier(self, frontier: Dict[str, MemoryEntry]) -> str:
         """Render the frontier candidates as bullet points for the prompt."""
         if not frontier:
@@ -233,7 +211,6 @@ class PromptedPolicyRetriever(BaseMemoryRetriever):
 
         return "\n".join(rows)
 
-
     def prompted_policy(
         self,
         user_question: str,
@@ -244,20 +221,7 @@ class PromptedPolicyRetriever(BaseMemoryRetriever):
         trace: Optional[List] = None,
         latency_tracker = None,
     ) -> Dict[str, Any]:
-        """
-        Ask the LLM what action to take next given the current state.
-
-        Args:
-            user_question: The original user question
-            current_query: Current query being used
-            memory_entries: List of memories in working set
-            frontier: Dictionary of frontier candidates
-            step: Current step number
-            max_steps: Maximum number of steps allowed
-
-        Returns:
-            Decision dictionary with action and parameters
-        """
+        """Ask the LLM what action to take next given the current state."""
 
         W_summary = self._format_working_set(memory_entries)
         F_summary = self._format_frontier(frontier)
@@ -320,7 +284,6 @@ class PromptedPolicyRetriever(BaseMemoryRetriever):
                 "llm_duration": 0.0
             }
 
-
     def retrieve(
         self,
         query: str,
@@ -333,23 +296,7 @@ class PromptedPolicyRetriever(BaseMemoryRetriever):
         latency_tracker = None,
         **kwargs
     ) -> List[MemoryEntry]:
-        """
-        Run the iterative LLM-driven retrieval loop.
-
-        Args:
-            query: Natural language query
-            top_k: Number of results to return (overrides config)
-            filters: Metadata filters for retrieval
-            enhance_query: Whether to use LLM query enhancement
-            enable_hybrid_search: Whether to enable hybrid search
-            enable_llm_filter: Whether to enable LLM-based filtering
-            query_mode: Query mode (ORIGINAL, CUE, or BOTH)
-            latency_tracker: Optional LatencyTracker for performance measurement
-            **kwargs: Additional parameters
-
-        Returns:
-            RetrievalResult with retrieved memories
-        """
+        """Run the iterative LLM-driven retrieval loop."""
         # Reset per-call state on the expander and trace.
         self.expander.reset()
         self.last_trace = []
@@ -475,7 +422,6 @@ class PromptedPolicyRetriever(BaseMemoryRetriever):
 
                 logger.info(f"Step {step_idx}: EXPAND - added {len(chosen)} memories")
                 continue
-
 
             # ---- RE_QUERY ----
             if action == "RE_QUERY":

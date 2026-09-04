@@ -1,18 +1,4 @@
-"""
-5 metrics for EnterpriseRAG-style document eval:
-
-  bleu_score      — answer-vs-gold sentence BLEU
-  f1_score        — token-level F1 (per LoCoMo convention)
-  llm_score       — LLM-as-Judge correctness (0/1 with reasoning)
-  doc_recall      — |retrieved_docs ∩ expected_doc_ids| / |expected_doc_ids|
-                    (replaces session_recall for EnterpriseRAG which has no sessions)
-  text_recall     — answer_facts coverage: fraction of gold answer_facts present
-                    in the retrieved evidence text. Falls back to gold answer
-                    token overlap if no answer_facts available.
-
-LoCoMo path uses the existing app/locomo/evals.py — these metrics are only for
-document_eval.
-"""
+"""5 metrics for EnterpriseRAG-style document eval:"""
 from __future__ import annotations
 
 import json
@@ -27,11 +13,6 @@ from megamem.document_eval.types import DocumentRetrievalConfig
 logger = logging.getLogger(__name__)
 
 
-# -------------------------------------------------------------------------
-# Tokenization / normalization helpers
-# -------------------------------------------------------------------------
-
-
 def _normalize(s: str) -> str:
     s = s.lower()
     s = re.sub(r"[^a-z0-9\s]", " ", s)
@@ -41,11 +22,6 @@ def _normalize(s: str) -> str:
 
 def _tokens(s: str) -> List[str]:
     return _normalize(s).split()
-
-
-# -------------------------------------------------------------------------
-# bleu, f1
-# -------------------------------------------------------------------------
 
 
 def bleu_score(pred: str, gold: str) -> float:
@@ -86,10 +62,6 @@ def f1_score(pred: str, gold: str) -> float:
     recall = matched / len(gold_toks)
     return 2 * precision * recall / (precision + recall)
 
-
-# -------------------------------------------------------------------------
-# llm_score (LLM-as-Judge)
-# -------------------------------------------------------------------------
 
 JUDGE_PROMPT = """\
 You are a strict evaluator. Decide whether the model's RESPONSE answers the QUESTION correctly
@@ -139,11 +111,6 @@ def llm_judge_score(
         return {"score": 0, "reasoning": f"judge_error:{type(exc).__name__}"}
 
 
-# -------------------------------------------------------------------------
-# doc_recall (new for EnterpriseRAG)
-# -------------------------------------------------------------------------
-
-
 def doc_recall(retrieved_doc_ids: List[str], expected_doc_ids: List[str]) -> float:
     """|retrieved ∩ expected| / |expected|. NaN-safe.
 
@@ -155,11 +122,6 @@ def doc_recall(retrieved_doc_ids: List[str], expected_doc_ids: List[str]) -> flo
     if not expected:
         return 0.0
     return len(retrieved & expected) / len(expected)
-
-
-# -------------------------------------------------------------------------
-# text_recall (answer_facts coverage in retrieved evidence)
-# -------------------------------------------------------------------------
 
 
 def _facts_present(fact: str, evidence_text: str, min_overlap: float = 0.5) -> bool:

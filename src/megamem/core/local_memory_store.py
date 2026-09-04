@@ -170,19 +170,7 @@ class LocalMemoryStore(MemoryStoreBase):
         where: Optional[Where] = None,
         include: Optional[List[str]] = None,
     ) -> List[MemoryEntry]:
-        """
-        Vector search to surface memories similar to the supplied context.
-        Retries to ride out transient ChromaDB indexing delays.
-
-        Args:
-            query: query context string to search for
-            top_k: Number of results to return
-            where: Filter conditions for metadata-based filtering
-            include: Fields to include in results
-
-        Returns:
-            List of MemoryEntry objects
-        """
+        """Vector search to surface memories similar to the supplied context."""
         with self._lock:
             include = include or ["metadatas", "distances"]
 
@@ -221,22 +209,7 @@ class LocalMemoryStore(MemoryStoreBase):
         top_k: int = 10,
         where: Optional[Where] = None,
     ) -> List[MemoryEntry]:
-        """
-        Keyword search against both index and value fields.
-        Walks keywords from longest to shortest and stops early once we have enough hits.
-
-        Longer keywords (3+ words) also match against contiguous subphrases (so
-        "sarah birthday cake" can match "birthday cake"). Shorter keywords (1-2
-        words) require an exact phrase match to avoid noisy results.
-
-        Args:
-            keywords: List of keywords/phrases to search for
-            top_k: Maximum number of results to return
-            where: Filter conditions for metadata-based filtering
-
-        Returns:
-            List of MemoryEntry objects with scores based on keyword length
-        """
+        """Keyword search against both index and value fields."""
         with self._lock:
             # Pull all candidate documents for in-memory phrase matching.
             result = self.db_client.get(
@@ -365,20 +338,7 @@ class LocalMemoryStore(MemoryStoreBase):
         where: Optional[Dict[str, Any]] = None,
         limit: int = 100,
     ) -> List[MemoryEntry]:
-        """
-        Metadata-only filtering — no embedding search involved.
-
-        Wraps ChromaDB's get() with a where clause to surface records that
-        match exact metadata constraints (data_type, timestamp_unix ranges, ...).
-        Used by the plan executor for FILTER-only retrieval steps.
-
-        Args:
-            where: ChromaDB where clause dict for metadata filtering
-            limit: Maximum number of results to return
-
-        Returns:
-            List of MemoryEntry objects matching the filter conditions
-        """
+        """Metadata-only filtering — no embedding search involved."""
         with self._lock:
             result = self.db_client.get(
                 collection=self.collection,

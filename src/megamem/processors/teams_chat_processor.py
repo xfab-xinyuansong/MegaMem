@@ -30,10 +30,6 @@ class TeamsChatProcessor(BaseProcessor):
         """
         self.max_tokens_per_segment = max_tokens_per_segment
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
     def can_process(self, file_path: Path) -> bool:
         """Return ``True`` when ``file_path`` looks like a Teams chat export."""
         if file_path.suffix.lower() != ".json":
@@ -78,21 +74,7 @@ class TeamsChatProcessor(BaseProcessor):
         *,
         source_label: str = "teams_chat",
     ) -> List[Segment]:
-        """Convert a list of :class:`NormalizedChatMessage` objects into segments.
-
-        Programmatic counterpart of :meth:`process` (which reads from JSON).
-        Converts each dataclass to a dict and reuses the same internal
-        pipeline.
-
-        Args:
-            messages: Chat messages — these may already be grouped into one
-                thread by the caller, or may span multiple threads (grouping
-                is performed internally).
-            source_label: Label written into ``source_file`` metadata.
-
-        Returns:
-            A list of :class:`Segment` objects.
-        """
+        """Convert a list of :class:`NormalizedChatMessage` objects into segments."""
         raw_msgs: List[Dict[str, Any]] = []
         for msg in messages:
             d = asdict(msg)
@@ -105,10 +87,6 @@ class TeamsChatProcessor(BaseProcessor):
         return self._process_raw_messages(
             raw_msgs, source_file=source_label,
         )
-
-    # ------------------------------------------------------------------
-    # Internal: shared segmentation pipeline
-    # ------------------------------------------------------------------
 
     def _process_raw_messages(
         self,
@@ -167,10 +145,6 @@ class TeamsChatProcessor(BaseProcessor):
                 )
 
         return segments
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _format_message(msg: Dict[str, Any]) -> str:

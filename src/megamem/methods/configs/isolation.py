@@ -1,19 +1,4 @@
-"""Released experiment-protocol isolation checks.
-
-Enforces hard configuration constraints at config-load time:
-
-- No governance / RBAC / memory_access fields
-- No LoCoMo / LoCoMo+ / subset / sample / max-N keys
-- No silent low-tier fallback for high-tier alias
-
-Any forbidden field must raise ``V4ConfigError`` (a retained compatibility name
-and subclass of ``RuntimeError``) so it
-propagates up to the runner and aborts the job with a clear message).
-
-Usage:
-    from megamem_v4.configs.isolation import validate_config
-    validate_config(config_dict)   # raises on any violation
-"""
+"""Released experiment-protocol isolation checks."""
 from __future__ import annotations
 
 import json
@@ -23,11 +8,6 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
-
-# -----------------------------------------------------------------------
-# Constants (kept in sync with schema.yaml — copied here so checks don't
-# silently bypass when schema.yaml is missing.)
-# -----------------------------------------------------------------------
 
 FORBIDDEN_KEYS = {
     "governance", "rbac", "memory_access", "access_label",
@@ -55,10 +35,6 @@ ALLOWED_METHODS = {
 class V4ConfigError(RuntimeError):
     """Raised when the released experiment protocol is violated."""
 
-
-# -----------------------------------------------------------------------
-# Core validation
-# -----------------------------------------------------------------------
 
 def _walk_keys(d: Any, parent: str = "") -> List[tuple]:
     """Walk every key/path in a nested dict-or-list; yield (path, key, value)."""
@@ -171,10 +147,6 @@ def validate_config(config: Dict[str, Any]) -> None:
         )
 
 
-# -----------------------------------------------------------------------
-# Convenience loaders
-# -----------------------------------------------------------------------
-
 def load_and_validate(path: str) -> Dict[str, Any]:
     """Load YAML or JSON config from path, validate it, return the dict."""
     if not os.path.exists(path):
@@ -190,10 +162,6 @@ def load_and_validate(path: str) -> Dict[str, Any]:
     validate_config(cfg)
     return cfg
 
-
-# -----------------------------------------------------------------------
-# Self-test (called from step1 smoke runner)
-# -----------------------------------------------------------------------
 
 def _self_test() -> int:
     """Build a few synthetic configs and verify FORBIDDEN keys / datasets trip the guard.

@@ -15,25 +15,7 @@ from megamem.core.memory import AgentMemory, QueryMode
 
 
 class SemanticRetriever(BaseMemoryRetriever):
-    """
-    Vector-similarity backed memory retrieval.
-
-    Delegates the actual search to ``AgentMemory.query`` — typically a
-    cosine-similarity lookup over an embedding index, optionally combined
-    with BM25 / hybrid scoring depending on configuration.
-
-    Capabilities:
-    - Vector-similarity search
-    - Score-based filtering
-    - Deduplication
-    - Query validation
-
-    Example:
-        retriever = SemanticRetrieval(cfg, user_id="user123")
-        result = retriever.retrieve("What is the user's favorite color?")
-        for memory in result.memories:
-            print(f"{memory.value} (score: {memory.score})")
-    """
+    """Vector-similarity backed memory retrieval."""
 
     def __init__(
         self,
@@ -70,20 +52,7 @@ class SemanticRetriever(BaseMemoryRetriever):
         latency_tracker = None,
         **kwargs
     ) -> List[MemoryEntry]:
-        """
-        Issue a single semantic query against the memory store.
-
-        Args:
-            query: Natural language query
-            top_k: Number of results to return (overrides config)
-            enable_hybrid_search: Whether to enable hybrid search
-            enable_llm_filter: Whether to enable LLM-based filtering
-            latency_tracker: Optional LatencyTracker for performance measurement
-            **kwargs: Additional parameters
-
-        Returns:
-            List of retrieved memories
-        """
+        """Issue a single semantic query against the memory store."""
         # Fall back to configured defaults when callers leave overrides empty.
         if top_k is None:
             top_k = self.top_k

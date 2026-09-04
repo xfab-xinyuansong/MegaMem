@@ -1,29 +1,4 @@
-"""
-Document build pipeline.
-
-Ingests a list of documents (each a dict with doc_id / title / source_type /
-content) and produces all 5 ChromaDB collections in a single pass:
-
-  raw_chunks         (DDI Stream A; also HDM Layer 4)
-  distilled_memory   (DDI Stream B)
-  cognitive          (CDM)
-  section_summaries  (HDM Layer 3)
-  doc_summaries      (HDM Layer 2)
-
-Reuses LLM extractors in document_eval.extractors. Embeddings come from the
-shared local sentence-transformers cache (DocumentRetrievalConfig.use_local_embedding).
-
-Stage 2 update — Resumability:
-- The pipeline now processes documents in fixed-size *shards* (default 25 docs).
-- Within each shard, all artifacts (raw chunks, distilled, cognitive, section
-  summaries, document summaries) are computed in dependency order and then
-  upserted in one batched write per collection.
-- After successful shard upsert, an append-only progress journal at
-  ``{chroma_path}/_doc_build_progress.jsonl`` is updated, one line per doc.
-- On resume, the journal is read first and any doc_id already marked done is
-  skipped. Doc-level atomicity (not chunk-level) keeps recovery simple and
-  correct: if a shard crashes mid-flight, all docs in that shard are re-tried.
-"""
+"""Document build pipeline."""
 from __future__ import annotations
 
 import hashlib
@@ -93,10 +68,6 @@ class DocumentBuildPipeline:
             "n_shards_completed": 0,
         }
 
-    # ------------------------------------------------------------------
-    # Progress journal helpers (Stage 2 resumability)
-    # ------------------------------------------------------------------
-
     @property
     def _progress_path(self) -> str:
         return os.path.join(self.cfg.chroma_path, PROGRESS_FILENAME)
@@ -146,10 +117,6 @@ class DocumentBuildPipeline:
         if os.path.exists(p):
             os.remove(p)
 
-    # ------------------------------------------------------------------
-    # Main entrypoint
-    # ------------------------------------------------------------------
-
     def build(
         self,
         documents: Iterable[Dict[str, Any]],
@@ -165,26 +132,7 @@ class DocumentBuildPipeline:
         shard_size: int = 25,
         progress_every: int = 25,
     ) -> Dict[str, Any]:
-        """Run the build pipeline.
-
-        documents: iterable of dicts with keys:
-            doc_id (str), title (str), source_type (str), content (str)
-
-        Resume semantics:
-          - force_rebuild=True (default) + resume=False → drop all collections AND the progress journal.
-            Full fresh build.
-          - force_rebuild=False, resume=False → keep collections, ignore journal, write everything.
-            (Legacy "skip ingest if store exists" behavior.)
-          - force_rebuild=False, resume=True → keep collections, read journal, skip doc_ids
-            marked done. **This is the Stage 2 default for resuming an interrupted build.**
-          - force_rebuild=True, resume=True → unsupported (would mean "drop data but keep history"),
-            we treat it as resume=False (i.e. clear journal + start over).
-
-        shard_size: number of docs processed (segment → extract → summarize → upsert
-            → journal) atomically. Smaller shards → finer-grained resume but more
-            Chroma write overhead; larger shards → faster steady state but more
-            re-work on crash. Recommended 20-50.
-        """
+        """Run the build pipeline."""
         t_start = time.time()
         self._reset_stats()
 
@@ -245,10 +193,6 @@ class DocumentBuildPipeline:
         self.stats["build_seconds"] = time.time() - t_start
         logger.info(f"Pipeline build complete in {self.stats['build_seconds']:.1f}s; stats={self.stats}")
         return self.stats
-
-    # ------------------------------------------------------------------
-    # Shard processor (atomic unit for resume)
-    # ------------------------------------------------------------------
 
     def _process_shard(
         self,
@@ -425,9 +369,6 @@ class DocumentBuildPipeline:
         if build_document_summaries and shard_doc_nodes:
             self._upsert_document_summaries(shard_doc_nodes)
 
-        # 6. Mark all docs in shard as done in the progress journal.
-        # If we crashed before reaching here, the shard's docs are NOT marked done
-        # and will be retried on resume (causing harmless upsert overwrites).
         now = time.time()
         recs = [{
             "doc_id": d["doc_id"],
@@ -450,10 +391,6 @@ class DocumentBuildPipeline:
             f"+{len(shard_cognitive)} cognitive, +{len(shard_section_nodes)} secs, "
             f"+{len(shard_doc_nodes)} docs)"
         )
-
-    # ------------------------------------------------------------------
-    # Extraction (per-chunk, parallel)
-    # ------------------------------------------------------------------
 
     def _extract_chunks_to_lists(
         self,
@@ -525,10 +462,6 @@ class DocumentBuildPipeline:
                         f"    extract: {done}/{len(raws)} chunks in shard "
                         f"(+{len(out_distilled)} distilled, +{len(out_cognitive)} cognitive total in shard)"
                     )
-
-    # ------------------------------------------------------------------
-    # Per-collection upsert helpers
-    # ------------------------------------------------------------------
 
     def _upsert_raw_chunks(self, raws: List[RawChunkEntry]) -> None:
         ids = [r.chunk_id for r in raws]

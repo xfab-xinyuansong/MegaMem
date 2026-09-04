@@ -24,10 +24,6 @@ from megamem.utils.misc import get_current_timestamp
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Generic email data model (provider-agnostic)
-# ---------------------------------------------------------------------------
-
 @dataclass
 class NormalizedEmail:
     """Provider-agnostic email representation.
@@ -45,10 +41,6 @@ class NormalizedEmail:
     conversation_id: str = ""        # thread grouping key
     message_id: str = ""             # unique identifier
 
-
-# ---------------------------------------------------------------------------
-# Pydantic models for structured LLM responses
-# ---------------------------------------------------------------------------
 
 class EmailMemoryOutput(BaseModel):
     """Single factual memory extracted from an email."""
@@ -90,10 +82,6 @@ class EmailEpisodicMemoryOutput(BaseModel):
         description="A 1-3 sentence summary of the email's overall content and purpose"
     )
 
-
-# ---------------------------------------------------------------------------
-# LLM prompts
-# ---------------------------------------------------------------------------
 
 PROMPT_EMAIL_THREAD_FILTER = """
 You are an email triage assistant. Decide whether an email thread contains enough meaningful information to extract lasting memories from.
@@ -205,10 +193,6 @@ EpisodicValue: [1-3 sentence summary of the email's content and purpose]
 Output:
 """
 
-
-# ---------------------------------------------------------------------------
-# Builder implementation
-# ---------------------------------------------------------------------------
 
 class EmailMemoryBuilder(MemoryBuilder):
     """Memory builder for extracting factual and episodic memories from emails.
@@ -422,19 +406,7 @@ class EmailMemoryBuilder(MemoryBuilder):
         self,
         emails: List[NormalizedEmail],
     ) -> List[MemoryEntry]:
-        """Build memories from an email thread (or a lone email).
-
-        First applies the thread-level filter; if the thread survives,
-        extracts factual (and, optionally, episodic) memories from each
-        email in turn.
-
-        Args:
-            emails: Chronologically ordered emails in the thread. A single
-                email is treated as a one-message thread.
-
-        Returns:
-            Every ``MemoryEntry`` produced across all emails.
-        """
+        """Build memories from an email thread (or a lone email)."""
         if not emails or not self.should_process_thread(emails):
             return []
 
@@ -535,17 +507,9 @@ class EmailMemoryBuilder(MemoryBuilder):
 
         return memory_entries, surviving_indices
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
     @staticmethod
     def _validate_cue_indices(cue_indices: List[str], primary_index: str) -> List[str]:
-        """Sanitize LLM-generated cue indices.
-
-        A cue is rejected when it is empty, a duplicate, only one word, or
-        identical to the primary index. The list is capped at three.
-        """
+        """Sanitize LLM-generated cue indices."""
         validated: List[str] = []
         seen: set = set()
         primary_lower = primary_index.lower()

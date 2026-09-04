@@ -22,10 +22,6 @@ from megamem.document_eval.types import (
 logger = logging.getLogger(__name__)
 
 
-# -------------------------------------------------------------------------
-# Distilled memory extraction (DDI Stream B)
-# -------------------------------------------------------------------------
-
 DISTILL_PROMPT_SYSTEM = """\
 You extract atomic, retrieval-friendly distilled memories from an enterprise document chunk.
 
@@ -106,10 +102,6 @@ def extract_distilled_memories(
         )
     return out
 
-
-# -------------------------------------------------------------------------
-# Cognitive extraction (CDM, 14 relation types in a single LLM call)
-# -------------------------------------------------------------------------
 
 COGNITIVE_TYPES = [
     "definition",
@@ -240,10 +232,6 @@ def extract_cognitive_relations(
     return out
 
 
-# -------------------------------------------------------------------------
-# Section / document summary
-# -------------------------------------------------------------------------
-
 SECTION_SUMMARY_PROMPT = """\
 Write a 1-3 sentence summary of the following document section. Focus on the topic
 and scope; do not include trivial details.
@@ -318,17 +306,6 @@ def summarize_document(
         logger.warning(f"Document summary failed for '{title}': {exc}")
         return joined[:600]
 
-
-# -------------------------------------------------------------------------
-# Option E — combined distilled + cognitive extraction (Stage 2 optimization)
-#
-# Single LLM call per chunk producing BOTH distilled memories and cognitive
-# relations. Halves the extract LLM calls (~50% wall-time saving) at the cost
-# of larger prompt + larger output.
-#
-# Deployments can compare this combined path with the separate-call path before
-# enabling it for a new collection.
-# -------------------------------------------------------------------------
 
 COMBINED_PROMPT_SYSTEM = """\
 You extract TWO kinds of structured knowledge from an enterprise document chunk:

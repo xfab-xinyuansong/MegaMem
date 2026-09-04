@@ -1,20 +1,4 @@
-"""
-Predictive Cue Anchor (PCA) Generator
-
-Builds **extrinsic** cue indices for memories by reasoning about the downstream
-contexts in which a memory will be relevant — including those that look
-semantically distant from the memory content itself.
-
-Standard (intrinsic) cues describe *what a memory is about*.
-Predictive cues describe *what a memory is relevant to*.
-
-Example
--------
-Memory: "User is allergic to seafood"
-  Intrinsic cues:  ["seafood allergy", "shellfish", "dietary restriction"]
-  Predictive cues: ["restaurant recommendation", "meal planning",
-                    "travel food planning", "dinner party"]
-"""
+"""Predictive Cue Anchor (PCA) Generator"""
 
 from typing import Dict, List, Optional
 
@@ -29,9 +13,6 @@ from megamem.utils.llm import ChatCompletionModel
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Prompt
-# ---------------------------------------------------------------------------
 
 PROMPT_PREDICTIVE_CUE = """\
 You are a memory-indexing assistant that generates **predictive retrieval cues**.
@@ -106,10 +87,6 @@ Intrinsic Cues: {intrinsic_cues}
 Produce your answer as structured JSON (category + list of chains).
 """
 
-# ---------------------------------------------------------------------------
-# Pydantic response models
-# ---------------------------------------------------------------------------
-
 
 class ImplicationChain(BaseModel):
     reasoning: str = Field(description="Brief reasoning chain connecting the memory to a retrieval context")
@@ -120,10 +97,6 @@ class PredictiveCueOutput(BaseModel):
     category: str = Field(description="Memory category: health_constraint, strong_preference, identity_fact, episodic_event, or transient_state")
     chains: List[ImplicationChain] = Field(default_factory=list, description="Implication chains with extracted cues")
 
-
-# ---------------------------------------------------------------------------
-# Quality filter helpers (embedding-based)
-# ---------------------------------------------------------------------------
 
 _sentence_model = None
 
@@ -168,10 +141,6 @@ def _cosine_sim_batch(model, texts_a: List[str], texts_b: List[str]):
     return sim_matrix.max(dim=1).values.cpu().numpy().tolist()
 
 
-# ---------------------------------------------------------------------------
-# Generator class
-# ---------------------------------------------------------------------------
-
 class PredictiveCueGenerator:
     """Produce extrinsic (predictive) cue indices for a memory entry."""
 
@@ -180,10 +149,6 @@ class PredictiveCueGenerator:
     def __init__(self, cfg: DictConfig, model_client: ChatCompletionModel):
         self.cfg = cfg
         self._model_client = model_client
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def generate(
         self,
@@ -207,10 +172,6 @@ class PredictiveCueGenerator:
             return []
 
         return self._filter_cues(raw_cues, intrinsic_cues, index)
-
-    # ------------------------------------------------------------------
-    # LLM call
-    # ------------------------------------------------------------------
 
     def _generate_chains(
         self, index: str, value: str, intrinsic_cues: List[str]
@@ -249,10 +210,6 @@ class PredictiveCueGenerator:
                 raise
 
         return result
-
-    # ------------------------------------------------------------------
-    # Quality filter
-    # ------------------------------------------------------------------
 
     def _filter_cues(
         self,

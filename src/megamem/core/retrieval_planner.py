@@ -1,16 +1,4 @@
-"""
-Retrieval Planner
-
-Inspects user queries and emits step-based execution plans built from three
-primitives:
-  - FILTER:           metadata-only filtering through a ChromaDB where clause
-  - RESOLVE:          structured extraction over FILTER results (no embeddings)
-  - SEMANTIC_SEARCH:  embedding-based similarity search
-
-The planner emits flat, typed filter fields — NOT raw ChromaDB where clause
-dicts. The executor (in AgentMemory) translates them into ChromaDB where
-clauses.
-"""
+"""Retrieval Planner"""
 
 import logging
 from datetime import datetime, timedelta
@@ -24,10 +12,6 @@ from megamem.utils.llm import ChatCompletionModel
 
 logger = logging.getLogger(__name__)
 
-
-# ---------------------------------------------------------------------------
-# Pydantic output models
-# ---------------------------------------------------------------------------
 
 class RetrievalStep(BaseModel):
     """One step inside the retrieval plan."""
@@ -135,8 +119,6 @@ class RetrievalPlan(BaseModel):
     reasoning: str = Field(
         description="Brief explanation of why this plan was chosen"
     )
-
-
 
 
 """
@@ -421,10 +403,6 @@ Produce the retrieval plan.
 """
 
 
-# ---------------------------------------------------------------------------
-# Planner class
-# ---------------------------------------------------------------------------
-
 class RetrievalPlanner:
     """
     Inspects user queries and emits a step-based execution plan.
@@ -485,30 +463,8 @@ class RetrievalPlanner:
             )
 
 
-# ---------------------------------------------------------------------------
-# Where clause builder (used by the executor in AgentMemory)
-# ---------------------------------------------------------------------------
-
 def build_where_clause(step: RetrievalStep) -> Optional[Dict]:
-    """
-    Translate a RetrievalStep's flat filter fields into a ChromaDB where clause.
-
-    Only handles ChromaDB-native operators:
-      - data_type exact match ($eq)
-      - timestamp_after → timestamp_unix $gte
-      - timestamp_before → timestamp_unix $lt
-
-    String-based filters (sender, recipients) flow through
-    get_string_filters() + apply_string_filters() instead, since
-    ChromaDB's $contains operator does not perform substring matching on
-    metadata fields (it is wired up for list membership / where_document).
-
-    Args:
-        step: RetrievalStep with flat filter fields
-
-    Returns:
-        ChromaDB-compatible where dict, or None if no filters apply.
-    """
+    """Translate a RetrievalStep's flat filter fields into a ChromaDB where clause."""
     conditions: List[Dict] = []
 
     if step.data_type:
@@ -563,22 +519,7 @@ def apply_string_filters(
     entries: List,
     string_filters: Dict[str, Any],
 ) -> List:
-    """
-    Apply Python-side substring filters to a list of MemoryEntry objects.
-
-    Walks each entry's extra_metadata for substring containment:
-      - sender: entry.extra_metadata["sender"] contains the filter value
-      - recipients: entry.extra_metadata["recipients"] contains the filter value
-      - author: entry.extra_metadata["author"] contains the filter value
-      - title: entry.extra_metadata["title"] or ["subject"] contains the filter value
-
-    Args:
-        entries: List of MemoryEntry objects to filter
-        string_filters: Dict from get_string_filters()
-
-    Returns:
-        Filtered list of MemoryEntry objects
-    """
+    """Apply Python-side substring filters to a list of MemoryEntry objects."""
     if not string_filters:
         return entries
 
@@ -642,37 +583,12 @@ def _date_to_unix(date_str: str) -> int:
         return 0
 
 
-# ---------------------------------------------------------------------------
-# Planner executor helpers (used by AgentMemory._execute_planner_query)
-# ---------------------------------------------------------------------------
-
 def resolve_source_cues(
     source_cues: List[MemoryEntry],
     return_mode: str,
     metadata_fields: Optional[List[str]] = None,
 ) -> List[MemoryEntry]:
-    """
-    Return deduplicated source-cue entries for a RESOLVE step.
-
-    Both return modes wrap a source cue in a MemoryEntry; the memory_type
-    tag conveys the caller's intent to the application layer:
-
-    - return_mode="metadata_summary" --> memory_type="resolve_list"
-      For listing/enumeration queries ("list emails from Sarah").
-
-
-    - return_mode="full_content" --> memory_type="resolve_content"
-      For summarization queries ("summarize doc A").
-
-    Args:
-        source_cues: Source cue entries from FILTER or SS(source_cues).
-        return_mode: "metadata_summary" or "full_content".
-        metadata_fields: Optional list of metadata field names to keep
-            (only used when return_mode="metadata_summary").
-
-    Returns:
-        Deduplicated list of MemoryEntry objects.
-    """
+    """Return deduplicated source-cue entries for a RESOLVE step."""
     memory_type = (
         "resolve_list" if return_mode == "metadata_summary"
         else "resolve_content"
@@ -734,19 +650,7 @@ def merge_where_clauses(clause_a: Optional[Dict], clause_b: Optional[Dict]) -> O
 
 
 def build_source_cue_filter(accumulated_where: Optional[Dict]) -> Dict:
-    """
-    Combine a FILTER's accumulated where clause with the source-cue restriction.
-
-    Ensures we only match source cue entries (cue_type == "source"),
-    while still honoring any data_type / timestamp / sender filters from
-    the plan.
-
-    Args:
-        accumulated_where: Where clause built by FILTER step, or None
-
-    Returns:
-        ChromaDB-compatible where dict scoped to source cues
-    """
+    """Combine a FILTER's accumulated where clause with the source-cue restriction."""
     source_cue_where = {"cue_type": {"$eq": "source"}}
     if not accumulated_where:
         return source_cue_where

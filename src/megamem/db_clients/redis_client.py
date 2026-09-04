@@ -30,9 +30,6 @@ from megamem.utils.embedding import BaseEmbeddingModel
 class RedisVectorDBClient(VectorDBClient):
     """``VectorDBClient`` backed by Redis Stack search/JSON modules."""
 
-    # Metadata fields that are auto-indexed both as TEXT (for free-text
-    # search) and as TAG (for exact filtering). Adding a field here makes
-    # it filterable by ``where`` clauses without code changes.
     DEFAULT_INDEXED_FIELDS = [
         "user_id",
         "linked_memory",
@@ -158,9 +155,6 @@ class RedisVectorDBClient(VectorDBClient):
             definition=definition,
         )
 
-        # Re-write any documents that already existed under this prefix so
-        # the new index picks them up. This handles the case where the
-        # index was previously dropped.
         prefix = self._get_collection_prefix(collection_name)
         existing_keys = self.client.keys(f"{prefix}:doc:*")
         if existing_keys:
@@ -275,9 +269,7 @@ class RedisVectorDBClient(VectorDBClient):
 
         def escape_redis_value(val: str) -> str:
             """Escape characters that would otherwise break a TAG query."""
-            # Redis TAG values reserve a fairly broad set of punctuation;
-            # we conservatively escape every character that has been
-            # observed to cause syntax errors in practice.
+
             special_chars = [
                 ",", ".", "<", ">", "{", "}", "[", "]", '"', "'", ":", ";",
                 "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "-", "+",
@@ -457,19 +449,7 @@ class RedisVectorDBClient(VectorDBClient):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Read records back from a Redis collection.
-
-        Args:
-            collection: collection info dict from ``get_or_create_collection``.
-            ids: optional whitelist of record ids.
-            where: optional filter clause.
-            include: fields to include in results (informational).
-            limit: maximum number of records to return.
-            offset: pagination offset (used with ``limit``).
-
-        Returns:
-            Result dictionary in ChromaDB-compatible shape.
-        """
+        """Read records back from a Redis collection."""
         collection_name = collection["name"]
         index_name = collection["index_name"]
 

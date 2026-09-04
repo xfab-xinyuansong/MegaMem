@@ -229,34 +229,7 @@ class MemoryBuilder(ABC):
         content: Union[str, List[str], List[Dict[str, str]]],
         metadata: Optional[Dict] = None,
     ) -> List[MemoryEntry]:
-        """Build (and dedupe) memory entries from a piece of context.
-
-        The high-level pipeline does the following:
-            1. Normalize the input into a consistent representation.
-            2. (Optional) generate and store an episodic memory summary.
-            3. Use the LLM to extract structured factual memory entries.
-            4. (Optional) attach predictive cue indices in parallel.
-            5. Upsert each entry, merging with similar existing memories
-               whenever the LLM judges that doing so is appropriate.
-
-        Duplicate prevention combines vector similarity, configurable
-        thresholds, and an LLM-driven merge decision.
-
-        Args:
-            content: Source context to mine. Accepted forms:
-                * ``str`` – a single natural-language blob.
-                * ``List[str]`` – a sequence of textual entries.
-                * ``List[Dict[str, str]]`` – structured key/value pairs.
-            metadata: Optional metadata to persist alongside each memory
-                (e.g. ``user_id``, tags, source identifiers).
-
-        Returns:
-            All memory entries created during this call.
-
-        Note:
-            Memories from the same batch (matched by timestamp) are skipped
-            during the update-candidate search.
-        """
+        """Build (and dedupe) memory entries from a piece of context."""
 
         # Standardize the various accepted input shapes.
         content = normalize_content(content, multimodal_support=self.multimodal_support)
@@ -416,21 +389,7 @@ class MemoryBuilder(ABC):
         self,
         entry: MemoryEntry,
     ) -> str:
-        """Add or merge a single memory entry with dedupe awareness.
-
-        Steps performed:
-            1. Detect any pre-existing entry that shares the index.
-            2. Search for similar candidates using vector similarity.
-            3. Ask the LLM whether the new entry should update one of them.
-            4. Either merge or add, then log the decision.
-
-        Args:
-            entry: The candidate memory entry.
-
-        Returns:
-            The index actually persisted in the store. This may differ from
-            ``entry.index`` when the entry was folded into an existing one.
-        """
+        """Add or merge a single memory entry with dedupe awareness."""
 
         # Short-circuit if a memory with this exact index already exists.
         existing_entry = self.megamem.get(entry.index)

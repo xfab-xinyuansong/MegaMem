@@ -306,11 +306,6 @@ def run_eval(
     return {"summary": summary, "canonical": canonical[0]}
 
 
-# -------------------------------------------------------------------------
-# CLI: cycle through 4 method configs (DDI / HDM / CDM / Combined)
-# -------------------------------------------------------------------------
-
-
 METHOD_CONFIGS: Dict[str, Dict[str, Any]] = {
     "ddi": {
         # DDI only: dual stream, no HDM routing, no CDM

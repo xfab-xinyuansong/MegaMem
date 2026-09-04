@@ -15,28 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class LatencyTracker:
-    """Collects timing data for the memory retrieval pipeline.
-
-    The tracker stores both raw per-operation timings and richer metadata
-    such as multi-step retrieval traces and prompt statistics.
-
-    Tracked dimensions:
-      * Search latency (with breakdown by sub-component)
-      * Per-step retrieval traces (for policy retrievers)
-      * Memory formatting time
-      * LLM generation time
-      * Prompt token / item statistics
-
-    Example:
-        tracker = LatencyTracker()
-        with tracker.track("search_primary"):
-            ...
-        with tracker.track("search_cue"):
-            ...
-
-        info = tracker.get_summary()
-        print(f"Total search time: {info['total_search_time']:.3f}s")
-    """
+    """Collects timing data for the memory retrieval pipeline."""
 
     def __init__(self):
         """Set up empty internal storage."""

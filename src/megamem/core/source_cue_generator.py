@@ -20,13 +20,6 @@ from megamem.utils.llm import ChatCompletionModel
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Per-data-type metadata schema registry
-# ---------------------------------------------------------------------------
-# Maps data_type → list of metadata keys the LLM should use for that type.
-# Adding a new source type (e.g., "teams_chat") means adding an entry here
-# and a matching example in the prompt.
-
 SOURCE_TYPE_METADATA_KEYS: Dict[str, List[str]] = {
     "mail": ["sender", "subject", "recipients", "date"],
     "doc":  ["author", "title", "date"],
@@ -43,10 +36,6 @@ def get_metadata_keys_for_type(data_type: str) -> List[str]:
     """Return the metadata keys that matter for the given data_type."""
     return SOURCE_TYPE_METADATA_KEYS.get(data_type, _DEFAULT_METADATA_KEYS)
 
-
-# ---------------------------------------------------------------------------
-# Prompt: produces a 1-2 sentence natural-language source description
-# ---------------------------------------------------------------------------
 
 PROMPT_SOURCE_CUE = """You are a source-description assistant for a memory system.
 
@@ -142,10 +131,6 @@ Produce the source description (1-2 sentences, no JSON):
 """
 
 
-# ---------------------------------------------------------------------------
-# Pydantic output model
-# ---------------------------------------------------------------------------
-
 class SourceCueDescription(BaseModel):
     """Structured LLM output: a natural-language source description."""
     description: str = Field(
@@ -153,51 +138,15 @@ class SourceCueDescription(BaseModel):
     )
 
 
-# ---------------------------------------------------------------------------
-# Generator class
-# ---------------------------------------------------------------------------
-
 class SourceCueGenerator:
-    """
-    Produces natural-language source descriptions used as source cue indices.
-
-    Relies only on structured metadata (sender, subject, date, ...) — never on
-    body content — so the resulting description is concise and well suited
-    for semantic search.
-
-    Usage:
-        generator = SourceCueGenerator(cfg)
-        description = generator.generate_source_cue({
-            "data_type": "mail",
-            "sender": "sarah.johnson@contoso.com",
-            "subject": "Q3 Budget Review",
-            "date": "2026-02-10",
-        })
-        # → "Email from Sarah Johnson about Q3 budget review, sent February 10 2026."
-    """
+    """Produces natural-language source descriptions used as source cue indices."""
 
     def __init__(self, cfg: DictConfig, model_client: Optional[ChatCompletionModel] = None):
         self.cfg = cfg
         self._model_client = model_client or ChatCompletionModel(cfg)
 
     def generate_source_cue(self, source_metadata: Dict[str, str]) -> str:
-        """
-        Render a 1-2 sentence natural-language description of the source.
-
-        Only the metadata keys relevant to the data_type are forwarded to the LLM
-        (per SOURCE_TYPE_METADATA_KEYS). Body content is never passed.
-
-        Args:
-            source_metadata: Dict with keys like:
-                - data_type: "mail", "doc", etc.
-                - sender / author: who created the source
-                - subject / title: what the source is about
-                - recipients: who received the source (for mail)
-                - date: when the source was created/sent
-
-        Returns:
-            A 1-2 sentence natural-language description string.
-        """
+        """Render a 1-2 sentence natural-language description of the source."""
         data_type = source_metadata.get("data_type", "")
 
         # Restrict to keys relevant to this data_type, plus data_type itself.

@@ -12,25 +12,7 @@ from megamem.core.memory import AgentMemory, QueryMode
 
 
 class MemoryExpander:
-    """
-    Grow retrieved memories by following their cue/link metadata.
-
-    The expander walks a working set of memories and surfaces candidates for
-    further exploration (the "frontier") by following memory links.  This
-    enables iterative retrieval where the system progressively reaches out
-    to related memories.
-
-    Features:
-    - Build a frontier from memory links
-    - Avoid duplicates against the working set
-    - Track visited memories across calls
-
-    Example:
-        expander = Expander()
-        frontier = expander.build_frontier(retrieved_memories)
-        for memory_id, memory in frontier.items():
-            print(f"Frontier candidate: {memory.index}")
-    """
+    """Grow retrieved memories by following their cue/link metadata."""
 
     def __init__(self, memory_client: Optional[AgentMemory] = None,
                  enable_relaxed_frontier: bool = False,
@@ -56,7 +38,6 @@ class MemoryExpander:
         self.max_cues_to_expand = max_cues_to_expand
         self.max_workers = max_workers
 
-
     def set_memory_client(self, memory_client: AgentMemory):
         """
         Wire in the memory client used to fetch linked memories.
@@ -70,20 +51,7 @@ class MemoryExpander:
             frontier: Dict[str, MemoryEntry],
             memories: List[MemoryEntry]
     ) -> Dict[str, MemoryEntry]:
-        """
-        Grow a frontier dictionary by walking from the given memories.
-
-        The frontier holds memories that are linked to the current working
-        set but have not yet been retrieved. Building one lets us efficiently
-        widen the search space.
-
-        Args:
-            frontier: Existing frontier dict to expand (can be empty {})
-            memories: List of MemoryEntry objects in the working set
-
-        Returns:
-            Updated frontier dictionary mapping memory IDs to MemoryEntry objects
-        """
+        """Grow a frontier dictionary by walking from the given memories."""
 
         if self.memory_client is None:
             raise ValueError("memory_client must be set before calling build_frontier()")
