@@ -198,8 +198,6 @@ make check
 | Representation and provenance | `python -m megamem.methods.dual_node` |
 | Token accounting | `python -m megamem.methods.token_ledger` |
 
-<sub><sub>Evaluation note. The evaluator in this repository is not identical to the official EnterpriseRAG-Bench evaluation pipeline, so local scores are not official leaderboard scores. Please refer to our submitted entry on the [official leaderboard](https://huggingface.co/spaces/onyx-dot-app/EnterpriseRAG-Bench-Leaderboard) once it is published.</sub></sub>
-
 ## Repository Layout
 
 ```text
@@ -216,6 +214,8 @@ MegaMem/
 ├── examples/             # runnable, credential-free examples
 ├── tests/                # package and method checks
 ```
+
+<sub>Evaluation note. The evaluator in this repository is not identical to the official EnterpriseRAG-Bench evaluation pipeline, so local scores are not official leaderboard scores. Please refer to our submitted entry on the [official leaderboard](https://huggingface.co/spaces/onyx-dot-app/EnterpriseRAG-Bench-Leaderboard) once it is published.</sub>
 
 ## Package Scope
 
