@@ -46,10 +46,6 @@ complete pipeline.
 
 ## Distilled and Detailed Memory
 
-<p align="center">
-  <img src="assets/megamem_distilled_detailed_memory.png" width="100%" alt="Document chunking, typed memory distillation, multi-route retrieval, and evidence resolution">
-</p>
-
 <p align="center"><em>Compact typed memories provide broad retrieval routes, while stable document identifiers resolve every selected memory hit back to detailed source evidence.</em></p>
 
 Documents are divided into detailed chunks and distilled into typed facts,
@@ -59,10 +55,6 @@ reranked, and selected memory hits are resolved to detailed chunks. Only the
 highest-ranked source evidence that fits the answer budget is loaded for generation.
 
 ## Multi-Route Recall and Post-Answer Attribution
-
-<p align="center">
-  <img src="assets/megamem_recall_attribution_answering.png" width="100%" alt="MegaMem recall, evidence selection, answering, and post-answer attribution">
-</p>
 
 <p align="center"><em>Both memory views are searched with original and transformed queries; reciprocal-rank fusion, deduplication, and cross-encoder reranking select detailed evidence, and attribution identifies supporting sources only after the answer is fixed.</em></p>
 
