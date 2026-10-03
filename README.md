@@ -32,10 +32,6 @@ evidence within a fixed budget reaches the answer model.
 
 ## Evidence-Driven Design Exploration
 
-<p align="center">
-  <img src="assets/megamem_design_exploration.png" width="100%" alt="Evidence-driven progression from hierarchical memory to the complete MegaMem design">
-</p>
-
 <p align="center"><em>MegaMem emerged through a measure-diagnose-revise loop: each mechanism addresses a failure exposed by the preceding design.</em></p>
 
 The initial hierarchy compressed access but weakened recall. A second, detailed view
