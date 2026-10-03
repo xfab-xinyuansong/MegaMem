@@ -1,10 +1,7 @@
-"""Public package surface for MegaMem."""
-
 from importlib import import_module
 from typing import Any
 
 __version__ = "0.1.0"
-# Star imports expose only interfaces supported by the core installation.
 __all__ = [
     "DualNode",
     "DualNodeError",
@@ -43,11 +40,6 @@ _EXPORTS = {
 
 
 def __getattr__(name: str) -> Any:
-    """Load optional subpackages only when requested.
-
-    Keeping the top-level import light makes version checks, packaging, and the
-    representation-level tests independent of optional retrieval backends.
-    """
     if name in {"browser", "huggingface", "methods", "utils"}:
         module = import_module(f"{__name__}.{name}")
         globals()[name] = module
@@ -61,7 +53,6 @@ def __getattr__(name: str) -> Any:
 
 
 def __dir__() -> list[str]:
-    """List both core exports and lazily available optional interfaces."""
     return sorted(
         set(globals()) | set(_EXPORTS) | {"browser", "huggingface", "methods", "utils"}
     )

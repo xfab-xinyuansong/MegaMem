@@ -1,5 +1,3 @@
-"""Local document ingestion and memory operations."""
-
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -27,14 +25,12 @@ logger = logging.getLogger(__name__)
 
 
 class LocalMemoryClient:
-    """High-level operations over an in-process, user-scoped memory store."""
 
     def __init__(
         self,
         cfg: DictConfig,
         user_id: str,
     ):
-        """Initialize the configured local store and processing pipeline."""
         self.cfg = cfg
         self.user_id = user_id
         self._megamem = AgentMemory(cfg, user_id=user_id)
@@ -50,38 +46,15 @@ class LocalMemoryClient:
         self._source_cue_generator = SourceCueGenerator(cfg, self._model_client)
 
     def _resolve_builder(self, builder: Optional[Union[str, Type[MemoryBuilder], MemoryBuilder]], default_type: str = "default") -> MemoryBuilder:
-        """
-        Normalize the *builder* argument into a concrete MemoryBuilder instance.
-
-        Args:
-            builder: Can be a string (builder type), MemoryBuilder class, MemoryBuilder instance, or None
-            default_type: Default builder type to use if builder is None
-
-        Returns:
-            MemoryBuilder instance
-        """
         if isinstance(builder, MemoryBuilder):
-            # A custom builder instance — use it directly.
             return builder
         if isinstance(builder, type) and issubclass(builder, MemoryBuilder):
-            # A builder class — instantiate it.
             return builder(self.cfg, self._megamem, self._model_client)
         if isinstance(builder, str):
-            # A type-name string — go through the registry.
             return self._get_memory_builder(builder)
-        # Nothing usable — fall back to the registry's default type.
         return self._get_memory_builder(default_type)
 
     def _get_memory_builder(self, file_type: str) -> MemoryBuilder:
-        """
-        Pick the right memory builder for the given file type.
-
-        Args:
-            file_type: The detected file type (e.g., 'markdown', 'word', 'pdf')
-
-        Returns:
-            MemoryBuilder instance
-        """
 
         builder_type_mapping = {
             "default": "chat",
@@ -122,8 +95,6 @@ class LocalMemoryClient:
         builder: Optional[Union[str, Type[MemoryBuilder], MemoryBuilder]] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
     ) -> List[MemoryEntry]:
-        """Add memory content from a file; user_id is stamped automatically."""
-        # Validate the file before doing real work.
         file_path = Path(file_path)
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
@@ -139,9 +110,7 @@ class LocalMemoryClient:
 
         metadata = metadata or {}
 
-        # Resolve the memory builder per the builder argument.
         if builder is None:
-            # Auto-detect file type and pick the matching builder.
             file_type = detect_file_type(file_path)
             memory_builder = self._resolve_builder(builder, default_type=file_type)
         else:
@@ -200,52 +169,33 @@ class LocalMemoryClient:
         return memory_entries
 
     def _process_file(self, file_path: Union[str, Path]) -> List[Segment]:
-        """
-        Process a file into segments using the processor registry.
-
-        Args:
-            file_path: Path to the file to process
-
-        Returns:
-            List of Segment objects containing the processed content
-        """
         file_path = Path(file_path)
 
-        # Pick the processor for this file type.
         processor = self.processor_registry.get_processor(file_path)
 
-        # Run the chosen processor over the file.
         return processor.process(file_path)
 
     def add(
         self,
         text: Union[str, List[str], List[Dict[str, str]]] = None,
         metadata: Optional[Dict] = None,
-        progress_callback: Optional[Callable[[int, int, str], None]] = None,  # for progress bar
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
         builder: Optional[Union[str, Type[MemoryBuilder], MemoryBuilder]] = None,
     ) -> List[MemoryEntry]:
-        """Add memory content; user_id is stamped automatically."""
         if text is None:
             raise ValueError("Text must be provided")
 
-        # Split text into segments so we can drive the progress callback.
-        # Paragraph splits (double newlines) form natural chunk boundaries.
         if isinstance(text, str) and self.cfg.memory.enable_segmentation:
-            # Prefer double-newline paragraphs, fall back to single newlines.
             raw_segments = text.split('\n\n') if '\n\n' in text else text.split('\n')
-            # Drop empty segments and wrap the rest as Segments.
             segments = [
                 Segment(content=chunk.strip(), segment_type="text", metadata=metadata)
                 for chunk in raw_segments if chunk.strip()
             ]
-            # If splitting produced nothing, fall back to a single segment.
             if not segments:
                 segments = [Segment(content=text, segment_type="text", metadata=metadata)]
         else:
-            # Non-string inputs are treated as a single segment.
             segments = [Segment(content=text, segment_type="text", metadata=metadata)]
 
-        # Resolve the memory builder per the builder argument.
         memory_builder: MemoryBuilder = self._resolve_builder(builder, default_type="default")
 
         memory_entries = []
@@ -267,18 +217,6 @@ class LocalMemoryClient:
         self,
         emails: List[NormalizedEmail],
     ) -> List[MemoryEntry]:
-        """Build memories from an email thread (or single email).
-
-        Runs a thread-level filter that skips low-substance threads, then
-        extracts memories from each email and creates a source cue per email
-        carrying full metadata (sender, subject, recipients, date).
-
-        Args:
-            emails: List of emails in the thread (chronological).
-
-        Returns:
-            List of MemoryEntry objects created.
-        """
         if not emails:
             return []
 
@@ -286,7 +224,6 @@ class LocalMemoryClient:
             "email", self.cfg, self._megamem, self._model_client
         )
 
-        # Thread-level filter — skip low-substance threads.
         if not builder.should_process_thread(emails):
             return []
 
@@ -294,13 +231,11 @@ class LocalMemoryClient:
 
         all_entries: List[MemoryEntry] = []
         for email in emails:
-            # Pull memories out of this email.
             entries, surviving_indices = builder._build_single_email(email, enable_episodic)
             if not entries:
                 continue
             all_entries.extend(entries)
 
-            # Build the metadata dict from the NormalizedEmail fields.
             sender_str = (
                 f"{email.sender_name} <{email.sender_address}>"
                 if email.sender_name
@@ -319,11 +254,9 @@ class LocalMemoryClient:
                 "source_ref": email.message_id,
             }
 
-            # Create the source cue, link it to this email's primary memories,
-            # and back-link the primary memories to the source cue.
             self._create_source_cue(
                 memory_entries=entries,
-                content="",  # not needed — data_type already set
+                content="",
                 metadata=email_metadata,
                 surviving_indices=surviving_indices,
             )
@@ -334,11 +267,9 @@ class LocalMemoryClient:
         self,
         messages: List[NormalizedChatMessage],
     ) -> List[MemoryEntry]:
-        """Build memories from a chat/Teams thread."""
         if not messages:
             return []
 
-        # TeamsChatProcessor segments the messages into chunks.
         processor = TeamsChatProcessor(
             max_tokens_per_segment=self.cfg.memory.get("max_tokens_per_segment", 0),
         )
@@ -347,13 +278,11 @@ class LocalMemoryClient:
         if not segments:
             return []
 
-        # Use the chat memory builder to extract memories per segment.
         memory_builder: MemoryBuilder = self._resolve_builder(None, default_type="chat")
 
         all_entries: List[MemoryEntry] = []
 
         for segment in segments:
-            # Stamp the segment metadata with the source-cue data_type.
             seg_meta = {**segment.metadata, "data_type": "teams"}
 
             entries = memory_builder.build(segment.content, metadata=seg_meta)
@@ -362,10 +291,8 @@ class LocalMemoryClient:
 
             all_entries.extend(entries)
 
-            # Surviving indices for the source cue links.
             surviving_indices = [e.index for e in entries if e.is_primary_index()]
 
-            # Create the source cue linking back to this segment's primary memories.
             self._create_source_cue(
                 memory_entries=entries,
                 content="",
@@ -381,7 +308,6 @@ class LocalMemoryClient:
         top_k: int = 5,
         latency_tracker=None,
     ) -> List[MemoryEntry]:
-        """Planner-driven retrieval pipeline for source-aware queries."""
         return self._megamem.planner_query(
             context,
             top_k=top_k,
@@ -399,8 +325,6 @@ class LocalMemoryClient:
         query_mode: Optional[QueryMode] = None,
         **kwargs,
     ):
-        """Vector search to surface memories matching the supplied context."""
-        # Default the query mode from config when not explicitly set.
         if query_mode is None:
             query_mode = (
                 QueryMode.BOTH
@@ -417,7 +341,7 @@ class LocalMemoryClient:
             enhance_query=self.cfg.memory.enhance_query,
             enable_hybrid_search=enable_hybrid_search,
             enable_llm_filter=enable_llm_filter,
-            **kwargs,  # Forward extras like latency_tracker.
+            **kwargs,
         )
 
     def expand_by_session(
@@ -425,24 +349,14 @@ class LocalMemoryClient:
         memory_results: List[MemoryEntry],
         max_per_session: int = 5,
     ) -> List[MemoryEntry]:
-        """Forward to AgentMemory.expand_by_session."""
         return self._megamem.expand_by_session(
             memory_results, max_per_session=max_per_session,
         )
 
     def get_all_cues(self) -> List[MemoryEntry]:
-        """Forward to AgentMemory.get_all_cues."""
         return self._megamem.get_all_cues()
 
     def list_memories(self, limit: int = 20) -> List[MemoryEntry]:
-        """
-        List every memory record for this user.
-
-        Args:
-            limit: Maximum number of records to return
-        Returns:
-            List of memory records as dictionaries
-        """
         return self._megamem.list_memories(limit=limit)
 
     def get_user_id(self) -> str:
@@ -452,45 +366,18 @@ class LocalMemoryClient:
         self,
         key: str,
     ) -> Optional[Dict[str, Any]]:
-        """
-        Fetch a single record using its natural-language key.
-
-        Args:
-            key: Natural language key to retrieve
-
-        Returns:
-            Dict with id, metadata, document fields or None if not found
-        """
         return self._megamem.get(key)
 
     def delete(self, key: str) -> None:
-        """
-        Remove a record using its natural-language key.
-
-        Args:
-            key: Natural language key to delete
-        """
         self._megamem.delete(key)
 
     def count(self) -> int:
-        """
-        Return the total number of memory records stored.
-
-        Returns:
-            Total count of memory records
-        """
         return self._megamem.count()
 
     def clear(self) -> None:
-        """
-        Drop every record in the collection.
-        """
         self._megamem.clear()
 
     def delete_all(self, **kwargs) -> None:
-        """
-        Delete every record matching *param* in the collection.
-        """
 
         if kwargs is None:
             param = {}
@@ -501,18 +388,6 @@ class LocalMemoryClient:
 
     @staticmethod
     def _detect_data_type(text: str) -> str:
-        """
-        Heuristic check for whether a chunk of text reads as an email or a document.
-
-        Inspects the leading 500 chars for email-style headers (From:, To:, Subject:, etc.).
-        Two or more such headers => "mail"; otherwise "doc".
-
-        Args:
-            text: Raw content text
-
-        Returns:
-            "mail" or "doc"
-        """
         text_lower = text[:500].lower()
         email_signals = ["from:", "to:", "subject:", "sent:", "cc:", "bcc:"]
         matches = sum(1 for signal in email_signals if signal in text_lower)
@@ -520,14 +395,12 @@ class LocalMemoryClient:
 
     @staticmethod
     def _iso_to_unix(iso_str: str) -> int:
-        """Convert an ISO timestamp string to a Unix timestamp (seconds)."""
         try:
             if iso_str.endswith('Z'):
                 iso_str = iso_str[:-1] + '+00:00'
             dt = datetime.fromisoformat(iso_str)
             return int(dt.timestamp())
         except (ValueError, AttributeError):
-            # Fall back to date-only parsing.
             try:
                 dt = datetime.strptime(iso_str, "%Y-%m-%d")
                 return int(dt.timestamp())
@@ -541,16 +414,13 @@ class LocalMemoryClient:
         metadata: Optional[Dict] = None,
         surviving_indices: Optional[List[str]] = None,
     ) -> Optional[str]:
-        """Create a source-cue index linking every primary memory from a single source."""
         metadata = metadata or {}
 
-        # Auto-detect data_type from the content headers when not supplied.
         data_type = metadata.get("data_type", "")
         if not data_type and content:
             data_type = self._detect_data_type(content)
             logger.info(f"Auto-detected data_type: {data_type}")
 
-        # Auto-derive timestamp_unix from a 'date' or 'timestamp' metadata field.
         timestamp_unix = metadata.get("timestamp_unix", 0)
         if not timestamp_unix:
             date_str = metadata.get("date", "") or metadata.get("timestamp", "")
@@ -564,7 +434,6 @@ class LocalMemoryClient:
                 if self._megamem.get(idx) is not None
             })
         else:
-            # Fallback for callers that don't pass surviving_indices.
             primary_indices = [
                 entry.index for entry in memory_entries
                 if entry.is_primary_index()
@@ -575,21 +444,16 @@ class LocalMemoryClient:
             logger.info("No primary factual memories to link. Skipping source cue.")
             return None
 
-        # Assemble the source metadata for the LLM prompt — metadata only, no body content.
-        # Keys are filtered per data_type via the SOURCE_TYPE_METADATA_KEYS registry.
         from megamem.core.source_cue_generator import get_metadata_keys_for_type
         source_meta = {"data_type": data_type}
         for key in get_metadata_keys_for_type(data_type):
             if key in metadata and metadata[key]:
                 source_meta[key] = metadata[key]
 
-        # Generate the natural-language source description.
         source_description = self._source_cue_generator.generate_source_cue(source_meta)
 
-        # Build the filterable metadata fields stored on the source cue.
         extra_metadata = self._extract_filterable_metadata(metadata, data_type)
 
-        # Persist the source cue via AgentMemory.
         rid = self._megamem.add_source_cue(
             source_description=source_description,
             linked_memory_indices=primary_indices,
@@ -606,7 +470,7 @@ class LocalMemoryClient:
 
     _FILTERABLE_FIELDS_REGISTRY: Dict[str, list] = {
         "mail": [
-            ("sender",     ["sender", "from", "author"],    None),  # uses _normalize_sender
+            ("sender",     ["sender", "from", "author"],    None),
             ("subject",    ["subject"],                      str.lower),
             ("recipients", ["to", "recipients"],             str.lower),
         ],
@@ -623,12 +487,10 @@ class LocalMemoryClient:
 
     @staticmethod
     def _extract_filterable_metadata(metadata: dict, data_type: str) -> dict:
-        """Build the filterable metadata fields stored on a source cue."""
         filterable: Dict[str, Any] = {}
 
         field_specs = LocalMemoryClient._FILTERABLE_FIELDS_REGISTRY.get(data_type, [])
         for output_key, candidate_keys, normalizer in field_specs:
-            # Pick the first non-empty candidate value.
             raw_value = ""
             for candidate in candidate_keys:
                 raw_value = metadata.get(candidate, "")
@@ -637,7 +499,6 @@ class LocalMemoryClient:
             if not raw_value:
                 continue
 
-            # Apply the normalizer — sender gets bespoke handling.
             if output_key == "sender":
                 filterable[output_key] = LocalMemoryClient._normalize_sender(raw_value)
             elif normalizer:
@@ -645,7 +506,6 @@ class LocalMemoryClient:
             else:
                 filterable[output_key] = raw_value
 
-        # source_ref is shared across every data type.
         source_ref = (
             metadata.get("source_ref", "")
             or metadata.get("file_path", "")
@@ -658,17 +518,14 @@ class LocalMemoryClient:
 
     @staticmethod
     def _normalize_sender(raw_sender: str) -> str:
-        """Normalize a sender string for consistent $contains matching."""
         import re
         if not raw_sender:
             return ""
 
-        # "Name <email>" → keep "Name".
         name_match = re.match(r'^([^<]+)<', raw_sender)
         if name_match:
             name = name_match.group(1).strip()
         elif '@' in raw_sender:
-            # Pure email: take the local part, swap dots/underscores for spaces.
             local_part = raw_sender.split('@')[0]
             name = re.sub(r'[._]', ' ', local_part)
         else:

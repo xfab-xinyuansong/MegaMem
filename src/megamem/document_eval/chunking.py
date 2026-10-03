@@ -1,4 +1,3 @@
-"""Document → Section → Chunk segmentation utilities."""
 from __future__ import annotations
 
 import re
@@ -42,10 +41,6 @@ HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$", re.MULTILINE)
 
 
 def split_into_sections(text: str) -> List[tuple]:
-    """Return list of (level, title, body_text) tuples.
-
-    If no headings found, returns a single ('', 0, text) tuple.
-    """
     if not text:
         return [("", 0, "")]
 
@@ -54,7 +49,6 @@ def split_into_sections(text: str) -> List[tuple]:
         return [("", 0, text.strip())]
 
     sections: List[tuple] = []
-    # Prefix (text before first heading) becomes an "intro" section
     if matches[0].start() > 0:
         prefix = text[: matches[0].start()].strip()
         if prefix:
@@ -76,12 +70,6 @@ def chunk_section(
     target_tokens: int,
     overlap_tokens: int = 0,
 ) -> List[str]:
-    """Greedy paragraph-aware chunker.
-
-    Splits body into paragraphs (blank-line separated); packs paragraphs into
-    chunks until target_tokens is exceeded. Paragraphs larger than target are
-    further split by sentence then by token if needed.
-    """
     if not body.strip():
         return []
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n", body) if p.strip()]
@@ -91,11 +79,9 @@ def chunk_section(
     for p in paragraphs:
         p_tokens = count_tokens(p)
         if p_tokens > target_tokens:
-            # Flush current
             if current:
                 chunks.append("\n\n".join(current))
                 current, current_tokens = [], 0
-            # Split big paragraph by sentences
             sentences = re.split(r"(?<=[.!?])\s+", p)
             sub_current: List[str] = []
             sub_tokens = 0
@@ -119,7 +105,6 @@ def chunk_section(
     if current:
         chunks.append("\n\n".join(current))
 
-    # Final safety: hard-truncate any chunk that still exceeds 2x target tokens
     safe: List[str] = []
     for c in chunks:
         toks = _ENC.encode(c)
@@ -138,11 +123,6 @@ def segment_document(
     overlap_tokens: int = 0,
     max_chunks: int = 200,
 ) -> List[SectionSpec]:
-    """Top-level: split a document into sections and chunks.
-
-    Returns ordered list of SectionSpec, each with ordered chunks. chunk_id
-    format: ``"{document_id}__sec_{section_idx}__chunk_{chunk_idx}"``.
-    """
     raw_sections = split_into_sections(text)
     out: List[SectionSpec] = []
     chunk_global_count = 0
@@ -170,12 +150,11 @@ def segment_document(
             )
             section.chunks.append(chunk)
             chunk_global_count += 1
-        if section.chunks:  # skip empty sections
+        if section.chunks:
             out.append(section)
         if chunk_global_count >= max_chunks:
             break
 
-    # Wire prev/next links between sections
     for i, sec in enumerate(out):
         if i > 0:
             sec.prev_section_id = out[i - 1].section_id

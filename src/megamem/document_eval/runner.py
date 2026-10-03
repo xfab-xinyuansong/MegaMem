@@ -1,9 +1,3 @@
-"""End-to-end document evaluation runner.
-
-Loads authorized document tables, question streams, optional corpus manifests,
-and optional split files. Builds the document-memory collections via
-DocumentBuildPipeline, then runs retrieval, answer generation, and metric export.
-"""
 from __future__ import annotations
 
 import argparse
@@ -35,11 +29,9 @@ def load_eval_inputs(
     split: str = "dev",
     max_questions: Optional[int] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """Load docs + questions, optionally restricted by tier and dev/test split."""
     import pandas as pd
 
     docs_df = pd.read_parquet(docs_parquet)
-    # Optional tier restriction
     if tier_manifest_parquet:
         tier_df = pd.read_parquet(tier_manifest_parquet)
         tier_ids = set(tier_df["doc_id"].tolist())
@@ -55,14 +47,12 @@ def load_eval_inputs(
             "content": _safe_str(row.get("content")),
         })
 
-    # Load questions
     qs: List[Dict[str, Any]] = []
     with open(questions_jsonl) as f:
         for line in f:
             if line.strip():
                 qs.append(json.loads(line))
 
-    # Dev/test split filter
     if split_json:
         with open(split_json) as f:
             split_data = json.load(f)
@@ -99,7 +89,6 @@ def run_eval(
     eval_workers: int = 4,
     skip_judge: bool = False,
 ) -> Dict[str, Any]:
-    """Build + evaluate one method configuration."""
     from megamem.document_eval import DocumentBuildPipeline, DocumentRetriever
     from megamem.document_eval.answering import generate_answer
     from megamem.document_eval.metrics import (
@@ -130,13 +119,11 @@ def run_eval(
             json.dump(build_stats, f, indent=2)
         logger.info(f"Build done: {build_stats}")
 
-    # Sanity counts
     collection_counts = {k: storage.count(k) for k in DocumentStorage.KINDS}
     logger.info(f"Collection counts: {collection_counts}")
 
     retriever = DocumentRetriever(cfg, storage=storage)
 
-    # ------------- per-question eval (parallel) -------------
     per_question_records: List[Dict[str, Any]] = []
     t_search_eval = time.time()
 
@@ -147,13 +134,10 @@ def run_eval(
         expected_docs = q.get("expected_doc_ids", []) or []
         answer_facts = q.get("answer_facts", []) or []
         qtype = q.get("question_type", "")
-        # 1. retrieval
         result = retriever.retrieve(question)
         retrieved_docs = result.documents_retrieved
-        # 2. answer
         ans_out = generate_answer(cfg, question, result.chunks)
         pred = ans_out["answer"]
-        # 3. metrics
         evidence_text = "\n".join(c.get("raw_text", "") for c in result.chunks)
         bleu = bleu_score(pred, gold)
         f1 = f1_score(pred, gold)
@@ -197,7 +181,6 @@ def run_eval(
 
     t_search_eval = time.time() - t_search_eval
 
-    # ------------- aggregate -------------
     n = len(per_question_records)
     if n == 0:
         agg: Dict[str, float] = {k: 0.0 for k in ["bleu_score", "f1_score", "llm_score", "doc_recall", "text_recall"]}
@@ -228,14 +211,12 @@ def run_eval(
         "wall_seconds_search_eval": round(t_search_eval, 1),
     }
 
-    # ------------- write outputs -------------
     with open(os.path.join(output_dir, "per_question.json"), "w") as f:
         json.dump(per_question_records, f, indent=2)
 
     with open(os.path.join(output_dir, "summary.json"), "w") as f:
         json.dump(summary, f, indent=2)
 
-    # Canonical results.json (project format, single experiment object)
     canonical = [
         {
             "project_id": "largecontextwindow",
@@ -308,7 +289,6 @@ def run_eval(
 
 METHOD_CONFIGS: Dict[str, Dict[str, Any]] = {
     "ddi": {
-        # DDI only: dual stream, no HDM routing, no CDM
         "enable_dual_index": True,
         "enable_raw_stream": True,
         "enable_distilled_stream": True,
@@ -319,8 +299,6 @@ METHOD_CONFIGS: Dict[str, Dict[str, Any]] = {
         "enable_cognitive_path": False,
     },
     "hdm": {
-        # HDM-only evaluation keeps routing off at 0M and retains hierarchical
-        # scoring through document and section summary collections.
         "enable_dual_index": True,
         "enable_raw_stream": True,
         "enable_distilled_stream": False,
@@ -331,7 +309,6 @@ METHOD_CONFIGS: Dict[str, Dict[str, Any]] = {
         "enable_cognitive_path": False,
     },
     "cdm": {
-        # CDM only: cognitive path + raw fallback (so chunks still get retrieved)
         "enable_dual_index": True,
         "enable_raw_stream": True,
         "enable_distilled_stream": False,
@@ -342,7 +319,6 @@ METHOD_CONFIGS: Dict[str, Dict[str, Any]] = {
         "enable_cognitive_path": True,
     },
     "combined": {
-        # Option A full (Stage 1 0M: HDM routing OFF)
         "enable_dual_index": True,
         "enable_raw_stream": True,
         "enable_distilled_stream": True,

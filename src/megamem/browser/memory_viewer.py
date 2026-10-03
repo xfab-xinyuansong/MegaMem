@@ -1,11 +1,3 @@
-"""
-Memory viewer.
-
-Headless companion to :class:`InteractiveMemoryBrowser` — provides
-programmatic summaries, search analyses, metadata pattern analysis and
-report export, all without a REPL.
-"""
-
 import os
 import json
 import logging
@@ -20,21 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 class MemoryViewer:
-    """
-    Programmatic facade over a ChromaDB-backed memory store.
-
-    Wraps :class:`ChromaBrowser` with helpers tailored for analysis and
-    reporting; no interactive UI involved.
-    """
 
     def __init__(self, db_path: str, collection_name: str = None):
-        """
-        Build the viewer.
-
-        Args:
-            db_path: Path to ChromaDB database directory
-            collection_name: Name of collection to analyze (optional)
-        """
         self.db_path = Path(db_path)
         self.collection_name = collection_name
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -53,16 +32,6 @@ class MemoryViewer:
         include_samples: bool = True,
         sample_count: int = 5,
     ) -> Dict[str, Any]:
-        """
-        Build a high-level summary of the active collection.
-
-        Args:
-            include_samples: Whether to include sample documents
-            sample_count: Number of sample documents to include
-
-        Returns:
-            Dict[str, Any]: Memory summary
-        """
         try:
             stats = self.chroma_browser.get_collection_stats()
 
@@ -100,16 +69,6 @@ class MemoryViewer:
         query: str,
         n_results: int = 10,
     ) -> Dict[str, Any]:
-        """
-        Run a semantic search and bundle aggregate stats with the hits.
-
-        Args:
-            query: Search query
-            n_results: Number of results to analyze
-
-        Returns:
-            Dict[str, Any]: Search results and analysis
-        """
         try:
             docs = self.chroma_browser.search_documents(query=query, n_results=n_results)
 
@@ -157,12 +116,6 @@ class MemoryViewer:
             }
 
     def analyze_metadata_patterns(self) -> Dict[str, Any]:
-        """
-        Tally the value distribution of every metadata field.
-
-        Returns:
-            Dict[str, Any]: Metadata pattern analysis
-        """
         try:
             documents = self.chroma_browser.get_all_documents()
 
@@ -190,7 +143,6 @@ class MemoryViewer:
                     bucket['data_types'].add(type(value).__name__)
 
             for field, data in field_stats.items():
-                # Sets are not JSON-serialisable; freeze to a list.
                 data['data_types'] = list(data['data_types'])
 
                 unique_values = len(data['values'])
@@ -229,13 +181,6 @@ class MemoryViewer:
         output_path: str,
         include_search_examples: bool = True,
     ) -> None:
-        """
-        Build a comprehensive JSON report and write it to ``output_path``.
-
-        Args:
-            output_path: Path to save the report
-            include_search_examples: Whether to include search examples
-        """
         try:
             report: Dict[str, Any] = {
                 'report_type': 'comprehensive_memory_analysis',
@@ -280,12 +225,6 @@ class MemoryViewer:
             raise
 
     def quick_stats(self) -> str:
-        """
-        Render compact, multi-line statistics text for the active collection.
-
-        Returns:
-            str: Formatted statistics
-        """
         try:
             stats = self.chroma_browser.get_collection_stats()
 

@@ -1,10 +1,3 @@
-"""
-Email Memory Builder
-
-Extracts factual and episodic memories from email messages.
-Accepts a generic email format (not tied to any specific provider).
-"""
-
 from __future__ import annotations
 
 import logging
@@ -26,24 +19,18 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class NormalizedEmail:
-    """Provider-agnostic email representation.
-
-    Parsers for specific formats (Microsoft Graph, Gmail, etc.) should convert
-    their raw data into this structure before passing to EmailMemoryBuilder.
-    """
     subject: str
     sender_name: str
     sender_address: str
-    to_recipients: List[Dict[str, str]] = field(default_factory=list)  # [{"name": ..., "address": ...}]
+    to_recipients: List[Dict[str, str]] = field(default_factory=list)
     cc_recipients: List[Dict[str, str]] = field(default_factory=list)
-    sent_datetime: str = ""          # ISO 8601 format
-    body_text: str = ""              # plain text (HTML already stripped)
-    conversation_id: str = ""        # thread grouping key
-    message_id: str = ""             # unique identifier
+    sent_datetime: str = ""
+    body_text: str = ""
+    conversation_id: str = ""
+    message_id: str = ""
 
 
 class EmailMemoryOutput(BaseModel):
-    """Single factual memory extracted from an email."""
     index: str = Field(
         description="A concise 6-8 word phrase summarizing the memory"
     )
@@ -60,21 +47,18 @@ class EmailMemoryOutput(BaseModel):
 
 
 class EmailMemoryOutputs(BaseModel):
-    """Container for multiple factual memories extracted from an email."""
     entries: List[EmailMemoryOutput] = Field(
         description="Factual memories extracted from the email"
     )
 
 
 class EmailFilterOutput(BaseModel):
-    """LLM decision on whether an email thread has enough substance to extract memories."""
     has_extractable_content: bool = Field(
         description="True if the email thread contains meaningful information worth remembering"
     )
 
 
 class EmailEpisodicMemoryOutput(BaseModel):
-    """Episodic memory summarizing an email."""
     episodic_index: str = Field(
         description="A short 6-8 word summary capturing the main topic of the email"
     )
@@ -195,11 +179,6 @@ Output:
 
 
 class EmailMemoryBuilder(MemoryBuilder):
-    """Memory builder for extracting factual and episodic memories from emails.
-
-    Accepts email body text as a plain string via ``client.add(body_text, builder="email", metadata=...)``.
-    Email metadata (subject, sender, recipients, date) is passed via the ``metadata`` dict.
-    """
 
     def __init__(self, cfg: DictConfig, megamem: AgentMemory, model_client: ChatCompletionModel):
         super().__init__(cfg, megamem, model_client)
@@ -209,18 +188,6 @@ class EmailMemoryBuilder(MemoryBuilder):
         content: Optional[Union[str, Dict]],
         metadata: Optional[Dict],
     ) -> List[MemoryEntry]:
-        """Extract factual memories out of an email body.
-
-        Args:
-            content: Normalized content from ``normalize_content()``.
-                     For emails this is ``{"text": body_text, "segment_messages": None}``.
-            metadata: Must include email-specific keys:
-                     ``email_subject``, ``email_sender``, ``email_recipients``,
-                     ``email_cc``, ``email_sent_datetime``.
-
-        Returns:
-            Newly built factual ``MemoryEntry`` objects.
-        """
         if isinstance(content, dict):
             content_text = content.get("text", "")
         else:
@@ -236,7 +203,6 @@ class EmailMemoryBuilder(MemoryBuilder):
         sender = md.get("email_sender", "")
         sent_datetime = md.get("email_sent_datetime", "")
 
-        # Run the email-specific extraction prompt.
         memories: EmailMemoryOutputs = self._model_client.invoke(
             input=PROMPT_BUILD_EMAIL_MEMORY,
             prompt_args={
@@ -285,15 +251,6 @@ class EmailMemoryBuilder(MemoryBuilder):
         content: Optional[Union[str, Dict]],
         metadata: Optional[Dict],
     ) -> Optional[MemoryEntry]:
-        """Produce a single episodic summary entry for an email.
-
-        Args:
-            content: Normalized content from ``normalize_content()``.
-            metadata: Must include email-specific context keys.
-
-        Returns:
-            The episodic ``MemoryEntry`` or ``None`` when generation failed.
-        """
         try:
             content_text = content.get("text", "") if isinstance(content, dict) else str(content)
 
@@ -330,14 +287,6 @@ class EmailMemoryBuilder(MemoryBuilder):
             return None
 
     def should_process_thread(self, emails: List[NormalizedEmail]) -> bool:
-        """Ask the LLM whether a thread carries enough substance for extraction.
-
-        Args:
-            emails: Thread messages in chronological order.
-
-        Returns:
-            ``True`` if the thread should be processed, ``False`` to skip it.
-        """
         if not emails:
             return False
 
@@ -345,7 +294,6 @@ class EmailMemoryBuilder(MemoryBuilder):
         last_email = emails[-1]
         subject = first_email.subject or "(no subject)"
 
-        # Collect every participant that appears anywhere in the thread.
         participants: set = set()
         for em in emails:
             participants.add(f"{em.sender_name} <{em.sender_address}>")
@@ -359,7 +307,6 @@ class EmailMemoryBuilder(MemoryBuilder):
         else:
             date_range = first_email.sent_datetime
 
-        # Build a compact thread preview (truncate each body so the prompt stays small).
         parts = [
             f"[{pos + 1}] From: {em.sender_name} | Date: {em.sent_datetime}\n{em.body_text.strip()[:300]}"
             for pos, em in enumerate(emails)
@@ -391,7 +338,6 @@ class EmailMemoryBuilder(MemoryBuilder):
             return True
 
     def _email_prompt_args(self, email: NormalizedEmail, content_text: str) -> Dict:
-        """Build LLM prompt arguments directly from a NormalizedEmail."""
         return {
             "subject": email.subject,
             "sender": f"{email.sender_name} <{email.sender_address}>",
@@ -406,13 +352,11 @@ class EmailMemoryBuilder(MemoryBuilder):
         self,
         emails: List[NormalizedEmail],
     ) -> List[MemoryEntry]:
-        """Build memories from an email thread (or a lone email)."""
         if not emails or not self.should_process_thread(emails):
             return []
 
         enable_episodic = self.cfg.memory.get("enable_episodic_memory", False)
 
-        # Process every email in the surviving thread.
         all_entries: List[MemoryEntry] = []
         for email in emails:
             entries, _surviving = self._build_single_email(email, enable_episodic)
@@ -425,17 +369,6 @@ class EmailMemoryBuilder(MemoryBuilder):
         email: NormalizedEmail,
         enable_episodic: bool = False,
     ) -> tuple:
-        """Extract memories from one email (no thread-level filter).
-
-        Args:
-            email: Email payload to mine for memories.
-            enable_episodic: When ``True``, also build an episodic summary.
-
-        Returns:
-            ``(memory_entries, surviving_indices)`` where the first item is
-            the freshly extracted entries and the second is the index that
-            actually landed in the store after upsert.
-        """
         subject = email.subject.strip()
         body = email.body_text.strip()
 
@@ -448,7 +381,6 @@ class EmailMemoryBuilder(MemoryBuilder):
         creation_time = get_current_timestamp()
         timestamp = email.sent_datetime
 
-        # ------ Step 1: optional episodic summary ------------------------
         episodic_memory_id = None
         if enable_episodic:
             try:
@@ -469,7 +401,6 @@ class EmailMemoryBuilder(MemoryBuilder):
             except Exception as exc:
                 logger.warning(f"Failed to generate episodic memory for email: {exc}")
 
-        # ------ Step 2: factual memory entries ---------------------------
         memories: EmailMemoryOutputs = self._model_client.invoke(
             input=PROMPT_BUILD_EMAIL_MEMORY,
             prompt_args=prompt_args,
@@ -500,7 +431,6 @@ class EmailMemoryBuilder(MemoryBuilder):
                 idx_label = getattr(mem_out, "index", f"email_memory_{pos}")
                 logger.error(f"Failed to create memory entry for '{idx_label}': {exc}")
 
-        # ------ Step 3: upsert each new entry ----------------------------
         surviving_indices: List[str] = [
             self.upsert_memory_entry(entry=entry) for entry in memory_entries
         ]
@@ -509,7 +439,6 @@ class EmailMemoryBuilder(MemoryBuilder):
 
     @staticmethod
     def _validate_cue_indices(cue_indices: List[str], primary_index: str) -> List[str]:
-        """Sanitize LLM-generated cue indices."""
         validated: List[str] = []
         seen: set = set()
         primary_lower = primary_index.lower()

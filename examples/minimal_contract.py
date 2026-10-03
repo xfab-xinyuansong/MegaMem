@@ -1,5 +1,3 @@
-"""Credential-free demonstration of MegaMem's dual-view node contract."""
-
 from __future__ import annotations
 
 from megamem.methods import DualNode, validate_batch

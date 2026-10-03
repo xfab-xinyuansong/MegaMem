@@ -1,15 +1,11 @@
 class TokenUsageCallback:
     def __init__(self):
-        """Initialise empty token-usage counters and per-model cost table."""
         self.prompt_tokens = 0
         self.completion_tokens = 0
         self.total_tokens = 0
-        # source_usage: {source: {model: {'prompt_tokens', 'completion_tokens', 'total_tokens'}}}
         self.source_usage = {}
-        # model_usage: {model: {'prompt_tokens', 'completion_tokens', 'total_tokens'}}
         self.model_usage = {}
 
-        # Optional cost table - USD per token, derived from per-million pricing.
         self.cost_per_token = {
             "chat_low": {"input": 0.15 / 1e6, "output": 0.60 / 1e6},
             "chat_high": {"input": 2.50 / 1e6, "output": 10.00 / 1e6},
@@ -23,7 +19,6 @@ class TokenUsageCallback:
         model: str,
         source: str = "",
     ):
-        """Add a usage record for a (source, model) pair."""
         self.prompt_tokens += prompt_tokens
         self.completion_tokens += completion_tokens
         self.total_tokens += prompt_tokens + completion_tokens
@@ -50,18 +45,6 @@ class TokenUsageCallback:
         global_bucket["total_tokens"] += prompt_tokens + completion_tokens
 
     def token_usage_report(self) -> str:
-        """Render a human-readable usage + cost report.
-
-        # Example Usage
-            callback = TokenUsageCallback()
-            callback.update(500, 200, model="chat_high", source="test1")
-            callback.update(1000, 300, model="chat_low", source="test1")
-            callback.update(800, 400, model="judge", source="test2")
-
-            # Get the report as a string
-            report = callback.generate_usage_report()
-            print(report)  # You can print, log, or save it to a file
-        """
         grand_total_cost = 0.0
         for model, usage in self.model_usage.items():
             if model in self.cost_per_token:

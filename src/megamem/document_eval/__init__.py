@@ -1,4 +1,3 @@
-"""megamem.document_eval — Stage 1 Document algorithms (DDI / HDM / CDM / Combined)."""
 from megamem.document_eval.types import (
     RawChunkEntry,
     DistilledMemoryEntry,

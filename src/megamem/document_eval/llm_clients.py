@@ -1,10 +1,3 @@
-"""General model and embedding clients for document_eval.
-
-The artifact exposes one public provider type: a general JSON model gateway
-configured through environment variables or DocumentRetrievalConfig fields.
-An optional secondary general API endpoint can be enabled for extraction-heavy
-runs, but it follows the same client contract as the primary route.
-"""
 from __future__ import annotations
 
 import logging
@@ -22,7 +15,6 @@ _GENERAL_CLIENTS: Dict[Tuple[str, str], GeneralAPIClient] = {}
 
 
 def _make_http_client(prefix: str = "LLM"):
-    """Create a requests session with tunable pools for parallel builds."""
     timeout_seconds = float(os.getenv(f"{prefix}_TIMEOUT_SECONDS", "120"))
     pool_max = int(os.getenv(f"{prefix}_POOL_MAX", "256"))
     pool_keepalive = int(os.getenv(f"{prefix}_POOL_KEEPALIVE", "128"))
@@ -40,7 +32,6 @@ def get_general_client(
     env_key: str,
     pool_prefix: str,
 ) -> GeneralAPIClient:
-    """Build or fetch a cached general chat API client."""
     base_url = api_base or os.getenv(env_base, "")
     key = api_key or os.getenv(env_key, "")
     if not base_url or not key:
@@ -67,7 +58,6 @@ def get_general_client(
 
 
 def get_primary_client(cfg: DocumentRetrievalConfig) -> GeneralAPIClient:
-    """Return the primary general API client."""
     return get_general_client(
         api_base=cfg.llm_api_base,
         api_key=cfg.llm_api_key,
@@ -78,7 +68,6 @@ def get_primary_client(cfg: DocumentRetrievalConfig) -> GeneralAPIClient:
 
 
 def get_secondary_client(cfg: DocumentRetrievalConfig) -> GeneralAPIClient:
-    """Return the optional secondary general API client."""
     return get_general_client(
         api_base=cfg.secondary_api_base,
         api_key=cfg.secondary_api_key,
@@ -97,12 +86,6 @@ def chat_completion(
     temperature: float = 0.0,
     response_format_json: bool = False,
 ) -> str:
-    """Run one chat completion through the configured general API.
-
-    If ``cfg.use_secondary_api`` is true and no explicit model is passed,
-    extraction/generation calls use the secondary route. Explicit model calls,
-    such as judge calls, always use the primary route.
-    """
     if model is None and cfg.use_secondary_api:
         client = get_secondary_client(cfg)
         model = cfg.secondary_model_id or os.getenv("SECONDARY_LLM_MODEL", "")
@@ -127,7 +110,6 @@ def chat_completion(
 
 
 def get_local_embedder(cfg: DocumentRetrievalConfig):
-    """Return cached sentence-transformers model."""
     name = cfg.local_embedding_model
     m = _LOCAL_ST_MODEL.get(name)
     if m is None:
@@ -144,7 +126,6 @@ def embed_texts(
     texts: List[str],
     batch_size: int = 64,
 ) -> List[List[float]]:
-    """Embed a list of strings."""
     if not texts:
         return []
     model = get_local_embedder(cfg)

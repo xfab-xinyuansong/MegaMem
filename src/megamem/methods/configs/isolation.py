@@ -1,4 +1,3 @@
-"""Released experiment-protocol isolation checks."""
 from __future__ import annotations
 
 import json
@@ -33,11 +32,10 @@ ALLOWED_METHODS = {
 
 
 class V4ConfigError(RuntimeError):
-    """Raised when the released experiment protocol is violated."""
+    pass
 
 
 def _walk_keys(d: Any, parent: str = "") -> List[tuple]:
-    """Walk every key/path in a nested dict-or-list; yield (path, key, value)."""
     out = []
     if isinstance(d, dict):
         for k, v in d.items():
@@ -54,28 +52,23 @@ def _walk_keys(d: Any, parent: str = "") -> List[tuple]:
 def _normalize(s: Any) -> str:
     if not isinstance(s, str):
         return ""
-    # case-insensitive + space/hyphen normalized
     return re.sub(r"[\s_\-]+", "_", s.strip().lower())
 
 
 def validate_config(config: Dict[str, Any]) -> None:
-    """Validate an experiment config; raise on any protocol violation."""
     if not isinstance(config, dict):
         raise V4ConfigError(f"config must be a dict, got {type(config).__name__}")
 
-    # 1. Check required top-level fields
     for required in ("run_id", "dataset", "method", "seed", "models", "paths", "tokenizer"):
         if required not in config:
             raise V4ConfigError(f"missing required field: {required!r}")
 
-    # 2. Method check
     method = config.get("method")
     if method not in ALLOWED_METHODS:
         raise V4ConfigError(
             f"method={method!r} not in allowed set {sorted(ALLOWED_METHODS)}"
         )
 
-    # 3. Dataset check
     dataset = _normalize(config.get("dataset", ""))
     if dataset in {_normalize(d) for d in FORBIDDEN_DATASETS}:
         raise V4ConfigError(
@@ -87,7 +80,6 @@ def validate_config(config: Dict[str, Any]) -> None:
             f"dataset={config.get('dataset')!r} not in allowed set {sorted(ALLOWED_DATASETS)}"
         )
 
-    # 4. Forbidden keys (anywhere in the config tree)
     violations = []
     for path, key, value in _walk_keys(config):
         key_norm = _normalize(key)
@@ -100,8 +92,6 @@ def validate_config(config: Dict[str, Any]) -> None:
             msg += f"  {path}: {k}={sv}\n"
         raise V4ConfigError(msg)
 
-    # 5. Forbidden dataset values inside config tree (substring match for paths,
-    # IDs, embedded references)
     for path, key, value in _walk_keys(config):
         if isinstance(value, str):
             v_norm = _normalize(value)
@@ -113,14 +103,12 @@ def validate_config(config: Dict[str, Any]) -> None:
                         "Released main runs may not reference LoCoMo / LoCoMo+ / subset paths."
                     )
 
-    # 6. Models block sanity
     models = config.get("models", {})
     if not isinstance(models, dict):
         raise V4ConfigError("models must be a dict")
     for slot in ("hierarchy_low", "hierarchy_high", "answer", "judge"):
         if slot not in models:
             raise V4ConfigError(f"models is missing required slot: {slot!r}")
-    # Fallback guard for high-tier slots.
     high = _normalize(str(models.get("hierarchy_high", "")))
     answer = _normalize(str(models.get("answer", "")))
     for label, val in (("hierarchy_high", high), ("answer", answer)):
@@ -131,12 +119,10 @@ def validate_config(config: Dict[str, Any]) -> None:
                 "Reroute through an explicit substitute alias with maintainer sign-off."
             )
 
-    # 7. seed sanity
     seed = config.get("seed")
     if not isinstance(seed, int) or seed < 0:
         raise V4ConfigError(f"seed must be a non-negative int, got {seed!r}")
 
-    # 8. promotion / decay only allowed on V4 / B5
     if "promotion" in config and method not in {"V4", "B5"}:
         raise V4ConfigError(
             f"promotion config block is only valid for V4 or B5, not {method!r}"
@@ -148,7 +134,6 @@ def validate_config(config: Dict[str, Any]) -> None:
 
 
 def load_and_validate(path: str) -> Dict[str, Any]:
-    """Load YAML or JSON config from path, validate it, return the dict."""
     if not os.path.exists(path):
         raise V4ConfigError(f"config path does not exist: {path}")
     with open(path) as f:
@@ -164,12 +149,7 @@ def load_and_validate(path: str) -> Dict[str, Any]:
 
 
 def _self_test() -> int:
-    """Build a few synthetic configs and verify FORBIDDEN keys / datasets trip the guard.
-
-    Returns 0 on full pass, 1 if any negative case slipped through.
-    """
     cases = [
-        # (label, config, should_fail, expected_error_substring)
         (
             "valid V4 own_full",
             dict(

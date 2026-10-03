@@ -1,10 +1,3 @@
-"""
-Interactive memory browser.
-
-REPL-style command loop on top of :class:`ChromaBrowser` for exploring
-megamem-managed memory stores from the terminal.
-"""
-
 import os
 import sys
 import json
@@ -19,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 def _coerce_filter_value(raw: str):
-    """Best-effort conversion of a string filter value to its native type."""
     lowered = raw.lower()
     if lowered in ('true', 'false'):
         return lowered == 'true'
@@ -31,21 +23,8 @@ def _coerce_filter_value(raw: str):
 
 
 class InteractiveMemoryBrowser:
-    """
-    Curses-free interactive browser for ChromaDB-backed memory stores.
-
-    Wraps :class:`ChromaBrowser` and dispatches typed commands to inspect,
-    search, filter, view and export documents.
-    """
 
     def __init__(self, db_path: str, collection_name: str = None):
-        """
-        Build an interactive browser instance.
-
-        Args:
-            db_path: Path to ChromaDB database directory
-            collection_name: Name of collection to browse (optional)
-        """
         self.db_path = Path(db_path)
         self.collection_name = collection_name
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -63,7 +42,6 @@ class InteractiveMemoryBrowser:
         self.current_filter: Optional[Dict[str, Any]] = None
 
     def run(self) -> None:
-        """Enter the REPL command loop."""
         print("\n" + "=" * 70)
         print("MEGAMEM INTERACTIVE MEMORY BROWSER")
         print("=" * 70)
@@ -73,7 +51,6 @@ class InteractiveMemoryBrowser:
 
         self._show_quick_stats()
 
-        # Map commands to handlers; argless handlers are wrapped to ignore args.
         argful = {
             'switch': self._switch_collection,
             'list': self._list_documents,
@@ -121,7 +98,6 @@ class InteractiveMemoryBrowser:
                 self.logger.error(f"Interactive browser error: {str(e)}")
 
     def _show_help(self) -> None:
-        """Print the in-app command cheat-sheet."""
         print("\n📚 AVAILABLE COMMANDS:")
         print("-" * 50)
         print("🔍 Collection Management:")
@@ -156,7 +132,6 @@ class InteractiveMemoryBrowser:
         print(f"📊 Current Status: {len(self.current_documents)} documents loaded{suffix}")
 
     def _show_quick_stats(self) -> None:
-        """Print a one-line summary of the active collection."""
         try:
             stats = self.chroma_browser.get_collection_stats()
             print(f"📈 Quick Stats: {stats.total_documents:,} documents, {len(stats.metadata_keys)} metadata fields")
@@ -164,7 +139,6 @@ class InteractiveMemoryBrowser:
             print(f"❌ Failed to load stats: {str(e)}")
 
     def _show_detailed_stats(self) -> None:
-        """Print a multi-section view of collection statistics."""
         print("\n📊 COLLECTION STATISTICS")
         print("-" * 50)
 
@@ -192,7 +166,6 @@ class InteractiveMemoryBrowser:
             print(f"❌ Failed to load detailed stats: {str(e)}")
 
     def _list_collections(self) -> None:
-        """Print every collection in the persistent store."""
         print("\n📚 AVAILABLE COLLECTIONS")
         print("-" * 50)
 
@@ -211,7 +184,6 @@ class InteractiveMemoryBrowser:
             print(f"❌ Failed to list collections: {str(e)}")
 
     def _switch_collection(self, args: List[str]) -> None:
-        """Switch to the collection named in ``args``."""
         if not args:
             print("❌ Usage: switch <collection_name>")
             return
@@ -223,7 +195,7 @@ class InteractiveMemoryBrowser:
                 print(f"❌ Failed to switch to collection: {target}")
                 return
 
-            self.current_documents = []  # drop cached docs from prev. collection
+            self.current_documents = []
             self.current_filter = None
             print(f"✅ Switched to collection: {target}")
             self._show_quick_stats()
@@ -232,7 +204,6 @@ class InteractiveMemoryBrowser:
             print(f"❌ Switch failed: {str(e)}")
 
     def _list_documents(self, args: List[str]) -> None:
-        """Print the first N documents in the active collection."""
         limit = 10
 
         if args:
@@ -272,7 +243,6 @@ class InteractiveMemoryBrowser:
             print(f"❌ Failed to load documents: {str(e)}")
 
     def _search_documents(self, args: List[str]) -> None:
-        """Run a semantic search over ``args`` joined into a query."""
         if not args:
             print("❌ Usage: search <query>")
             return
@@ -303,7 +273,6 @@ class InteractiveMemoryBrowser:
             print(f"❌ Search failed: {str(e)}")
 
     def _filter_documents(self, args: List[str]) -> None:
-        """Apply a metadata equality filter parsed from ``key=value``."""
         if not args:
             print("❌ Usage: filter <key>=<value>")
             print("   Example: filter source_file=handbook.md")
@@ -347,13 +316,11 @@ class InteractiveMemoryBrowser:
             print(f"❌ Filter failed: {str(e)}")
 
     def _clear_filter(self) -> None:
-        """Drop the active filter and any cached documents."""
         self.current_filter = None
         self.current_documents = []
         print("✅ Filter cleared")
 
     def _show_document_detail(self, args: List[str]) -> None:
-        """Show the full record for a numeric index or document id."""
         if not args:
             print("❌ Usage: show <document_id_or_index>")
             return
@@ -370,7 +337,6 @@ class InteractiveMemoryBrowser:
                     print(f"❌ Invalid index. Use 1-{len(self.current_documents)}")
                     return
             else:
-                # Fall back to scanning all docs by id / id-prefix.
                 for doc in self.chroma_browser.get_all_documents():
                     if doc.id == identifier or doc.id.startswith(identifier):
                         document = doc
@@ -404,7 +370,6 @@ class InteractiveMemoryBrowser:
             print(f"❌ Failed to show document details: {str(e)}")
 
     def _export_documents(self, args: List[str]) -> None:
-        """Persist the currently-loaded documents in the requested format."""
         if len(args) < 2:
             print("❌ Usage: export <format> <filepath>")
             print("   Formats: json, csv, txt")
@@ -433,7 +398,6 @@ class InteractiveMemoryBrowser:
             print(f"❌ Export failed: {str(e)}")
 
     def _count_documents(self) -> None:
-        """Print the document count for the active collection."""
         try:
             stats = self.chroma_browser.get_collection_stats()
             print(f"📊 Total documents in collection: {stats.total_documents:,}")
@@ -441,7 +405,6 @@ class InteractiveMemoryBrowser:
             print(f"❌ Failed to count documents: {str(e)}")
 
     def _show_metadata_info(self, args: List[str]) -> None:
-        """Print metadata field summary, optionally drilling into one key."""
         print("\n🏷️  METADATA INFORMATION")
         print("-" * 50)
 
@@ -484,7 +447,6 @@ class InteractiveMemoryBrowser:
 
 
 def main():
-    """CLI entry point: launch the interactive memory browser."""
     import argparse
 
     parser = argparse.ArgumentParser(

@@ -1,5 +1,3 @@
-"""High-level local and remote memory client."""
-
 from __future__ import annotations
 
 from importlib import import_module
@@ -33,12 +31,6 @@ _RETRIEVER_REGISTRY = {
 
 
 class MemoryClient:
-    """Facade over an in-process store or a remote MegaMem service.
-
-    Pass ``cfg`` and ``user_id`` for local operation. Pass ``api_key`` for
-    remote add, query, and planner-query operations. Importing this class does
-    not load local vector-store, model, or document-processing dependencies.
-    """
 
     def __init__(
         self,
@@ -73,7 +65,6 @@ class MemoryClient:
 
     @property
     def is_remote(self) -> bool:
-        """Return whether this instance uses the remote service adapter."""
         return self._is_remote
 
     def _local(self, feature: str) -> LocalMemoryClient:
@@ -90,7 +81,6 @@ class MemoryClient:
         builder: Optional[Union[str, Type[MemoryBuilder], MemoryBuilder]] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
     ) -> Any:
-        """Persist text or structured messages."""
         if self.is_remote:
             if builder is not None or progress_callback is not None:
                 raise ValueError("Custom builders and progress callbacks require local mode.")
@@ -103,11 +93,9 @@ class MemoryClient:
         )
 
     def add_emails(self, emails: List[NormalizedEmail]) -> List[MemoryEntry]:
-        """Extract and persist memories from an email thread."""
         return self._local("add_emails").add_emails(emails)
 
     def add_chats(self, messages: List[NormalizedChatMessage]) -> List[MemoryEntry]:
-        """Extract and persist memories from a chat thread."""
         return self._local("add_chats").add_chats(messages)
 
     def add_file(
@@ -117,7 +105,6 @@ class MemoryClient:
         builder: Optional[Union[str, Type[MemoryBuilder], MemoryBuilder]] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
     ) -> List[MemoryEntry]:
-        """Process a supported file and persist its memories."""
         return self._local("add_file").add_file(
             file_path,
             metadata=metadata,
@@ -136,7 +123,6 @@ class MemoryClient:
         query_mode: Any = None,
         **kwargs: Any,
     ) -> Any:
-        """Return memories matching a query or structured context."""
         return self._client.query(
             context,
             top_k=top_k,
@@ -154,7 +140,6 @@ class MemoryClient:
         top_k: int = 5,
         latency_tracker: Any = None,
     ) -> Any:
-        """Run source-aware planner retrieval."""
         return self._client.planner_query(
             context,
             top_k=top_k,
@@ -168,7 +153,6 @@ class MemoryClient:
         query_type: str = "prompt",
         latency_tracker: Any = None,
     ) -> List[MemoryEntry]:
-        """Run one of the registered local retrieval strategies."""
         local_client = self._local("advanced_query")
         try:
             module_name, class_name = _RETRIEVER_REGISTRY[query_type]
@@ -192,29 +176,22 @@ class MemoryClient:
         query_type: str = "prompt",
         latency_tracker: Any = None,
     ) -> List[MemoryEntry]:
-        """Compatibility alias for :meth:`advanced_query`."""
         return self.advanced_query(context, top_k, query_type, latency_tracker)
 
     def list_memories(self, limit: int = 20) -> List[MemoryEntry]:
-        """List local memory records, capped by ``limit``."""
         return self._local("list_memories").list_memories(limit=limit)
 
     def get(self, key: str) -> Optional[Dict[str, Any]]:
-        """Fetch a local record by its natural-language key."""
         return self._local("get").get(key)
 
     def delete(self, key: str) -> None:
-        """Delete a local record by key."""
         self._local("delete").delete(key)
 
     def count(self) -> int:
-        """Return the number of records in a local store."""
         return self._local("count").count()
 
     def clear(self) -> None:
-        """Remove every record from a local store."""
         self._local("clear").clear()
 
     def delete_all(self, **kwargs: Any) -> None:
-        """Delete local records matching the supplied filters."""
         self._local("delete_all").delete_all(**kwargs)

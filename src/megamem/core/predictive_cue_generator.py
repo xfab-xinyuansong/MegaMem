@@ -1,5 +1,3 @@
-"""Predictive Cue Anchor (PCA) Generator"""
-
 from typing import Dict, List, Optional
 
 import logging
@@ -102,7 +100,6 @@ _sentence_model = None
 
 
 def _get_sentence_model():
-    """Lazily instantiate a small sentence-transformer used for cue filtering."""
     global _sentence_model
     if _sentence_model is not None:
         return _sentence_model
@@ -128,7 +125,6 @@ _OVER_GENERIC_PHRASES = frozenset({
 
 
 def _cosine_sim_batch(model, texts_a: List[str], texts_b: List[str]):
-    """For each text in *texts_a*, return its max cosine similarity against any text in *texts_b*."""
     import numpy as np
     from sentence_transformers.util import pytorch_cos_sim
 
@@ -137,12 +133,11 @@ def _cosine_sim_batch(model, texts_a: List[str], texts_b: List[str]):
 
     emb_a = model.encode(texts_a, convert_to_tensor=True)
     emb_b = model.encode(texts_b, convert_to_tensor=True)
-    sim_matrix = pytorch_cos_sim(emb_a, emb_b)  # shape: (len_a, len_b)
+    sim_matrix = pytorch_cos_sim(emb_a, emb_b)
     return sim_matrix.max(dim=1).values.cpu().numpy().tolist()
 
 
 class PredictiveCueGenerator:
-    """Produce extrinsic (predictive) cue indices for a memory entry."""
 
     REDUNDANCY_THRESHOLD = 0.75
 
@@ -156,11 +151,6 @@ class PredictiveCueGenerator:
         value: str,
         intrinsic_cues: List[str],
     ) -> List[str]:
-        """Produce predictive cues for a single memory.
-
-        Returns a deduplicated, quality-filtered list of extrinsic cue
-        phrases (possibly empty for transient-state memories).
-        """
         try:
             output = self._generate_chains(index, value, intrinsic_cues)
         except Exception:
@@ -182,8 +172,6 @@ class PredictiveCueGenerator:
             "value": value,
             "intrinsic_cues": intrinsic_str,
         }
-        # ChatCompletionModel already injects seed from cfg.llm.seed;
-        # we only pass temperature here to avoid duplicate-keyword errors.
         kwargs: Dict = {"temperature": 0.7}
 
         try:
@@ -217,8 +205,6 @@ class PredictiveCueGenerator:
         intrinsic_cues: List[str],
         primary_index: str,
     ) -> List[str]:
-        """Drop redundant, over-generic, or duplicate cues."""
-        # 1. Case-insensitive deduplication.
         seen_lower: set = set()
         unique: List[str] = []
         for cue in raw_cues:
@@ -228,13 +214,11 @@ class PredictiveCueGenerator:
             seen_lower.add(low)
             unique.append(cue)
 
-        # 2. Strip out over-generic phrases.
         filtered = [
             c for c in unique
             if c.lower() not in _OVER_GENERIC_PHRASES and len(c.split()) >= 2
         ]
 
-        # 3. Embedding-based redundancy check vs intrinsic cues + primary index.
         model = _get_sentence_model()
         if model is not None and (intrinsic_cues or primary_index):
             reference_texts = list(intrinsic_cues) + [primary_index]

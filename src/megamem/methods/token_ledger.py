@@ -1,4 +1,3 @@
-"""MegaMem per-phase, per-model token accounting."""
 from __future__ import annotations
 
 import json
@@ -29,7 +28,6 @@ ALL_PHASES = (
 
 @dataclass
 class CallRecord:
-    """One LLM API call."""
     phase: str
     model_alias: str
     input_tokens: int
@@ -41,7 +39,6 @@ class CallRecord:
 
 
 class TokenLedger:
-    """In-memory ledger; flush to JSON at end."""
 
     def __init__(self, prices: Optional[Dict[str, Dict[str, float]]] = None,
                  run_id: str = "", method: str = "",
@@ -57,7 +54,6 @@ class TokenLedger:
         self.run_id = run_id
         self.method = method
         self.t_start = time.time()
-        # PROVISIONAL alias tracking (alias-tracking protocol)
         self.alias_status = alias_status
         self.alias_chosen_at = alias_chosen_at
         self.alias_chosen_by = alias_chosen_by
@@ -71,7 +67,6 @@ class TokenLedger:
     def record(self, phase: str, model_alias: str, input_tokens: int,
                output_tokens: int, wall_seconds: float, **extra) -> None:
         if phase not in ALL_PHASES:
-            # Allow custom phases but warn (we don't raise — flexibility for ablations).
             pass
         cost = self._compute_cost(model_alias, input_tokens, output_tokens)
         rec = CallRecord(

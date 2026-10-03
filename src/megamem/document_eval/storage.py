@@ -1,4 +1,3 @@
-"""ChromaDB storage wrapper for document_eval."""
 from __future__ import annotations
 
 import logging
@@ -15,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class LocalEmbeddingFn(EmbeddingFunction):
-    """ChromaDB embedding function backed by our shared local embedder."""
 
     def __init__(self, cfg: DocumentRetrievalConfig):
         self._cfg = cfg
@@ -42,7 +40,6 @@ def _get_client(cfg: DocumentRetrievalConfig):
 
 
 class DocumentStorage:
-    """Wrapper exposing collection-level upsert + query."""
 
     KINDS = ("raw_chunks", "distilled_memory", "cognitive", "section_summaries", "doc_summaries")
 
@@ -113,7 +110,6 @@ class DocumentStorage:
         return col.get(ids=ids, include=["documents", "metadatas"])
 
     def reset_collection(self, kind: str) -> None:
-        """Delete and recreate a single collection (for force_rebuild)."""
         name = self.cfg.collection_name(kind)
         try:
             self._client.delete_collection(name)
@@ -125,7 +121,3 @@ class DocumentStorage:
     def reset_all(self) -> None:
         for k in self.KINDS:
             self.reset_collection(k)
-
-
-# Source registry (chunk_id -> raw text + metadata) is just a wrapper around the
-# raw_chunks collection's get_by_ids — no separate registry needed.

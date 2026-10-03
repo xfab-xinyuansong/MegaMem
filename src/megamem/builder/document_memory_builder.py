@@ -21,8 +21,6 @@ from megamem.builder.memory_builder import MemoryBuilder, MemoryOutputs
 logger = logging.getLogger(__name__)
 
 
-# Prompt for Document-level episodic memory (a.k.a. Document Summary, per plan.md §4
-# mapping "Conversation -> Document, Episodic Memory -> Document Summary").
 PROMPT_BUILD_DOCUMENT_EPISODIC = """
 You are an expert document summarization assistant. Given a document segment, generate a
 concise high-level summary that captures the topic, scope, and main thrust of the segment.
@@ -144,25 +142,13 @@ class DocumentMemoryBuilder(MemoryBuilder):
     def build_memory_entries(
         self, content: Union[str, Dict], metadata: Optional[Dict]
     ) -> List[MemoryEntry]:
-        """Build memory entries from a document segment.
 
-        Args:
-            content: Text (or multimodal dict) the LLM will analyze.
-            metadata: Extra metadata recorded alongside each entry.
-
-        Returns:
-            Memory entries derived from ``content``.
-        """
-
-        # Always rely on the document-specific extraction prompt.
         build_memory_prompt = PROMPT_BUILD_DOCUMENT_MEMORY
         response_format = MemoryOutputs
 
-        # First try the multimodal path (text + images dict).
         memories = self.handle_multimodal_content(content, metadata, build_memory_prompt, response_format)
 
         if memories is None:
-            # Fallback: pure text content.
             memories = self._model_client.invoke(
                 input=build_memory_prompt,
                 prompt_args={
@@ -171,10 +157,8 @@ class DocumentMemoryBuilder(MemoryBuilder):
                 response_format=response_format,
             )
 
-        # Convert raw LLM output into MemoryEntry objects (cues come later).
         memory_entries = convert_memory_output(memories, metadata, enable_cue_index=False)
 
-        # Optionally enrich each entry with cue indices via a single batch call.
         if self.cfg.memory.enable_cue_index and memory_entries:
             try:
                 memories_batch = [
@@ -190,7 +174,6 @@ class DocumentMemoryBuilder(MemoryBuilder):
 
             except Exception as exc:
                 logger.warning(f"Failed to generate cue indices in batch: {exc}")
-                # Default to empty cues on any failure.
                 for e in memory_entries:
                     e.cue_indices = ""
 
@@ -201,10 +184,7 @@ class DocumentMemoryBuilder(MemoryBuilder):
         content: Optional[Union[str, Dict]],
         metadata: Optional[Dict],
     ) -> Optional[MemoryEntry]:
-        """Build a Document-level episodic summary via the LLM."""
         try:
-            # After normalize_content the payload is either a string or a dict with
-            # a "text" field; pick the textual portion either way.
             content_text = (
                 content["text"] if isinstance(content, dict) and "text" in content else content
             )

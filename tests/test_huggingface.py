@@ -15,7 +15,7 @@ def test_load_enterprise_rag_uses_public_configs(monkeypatch) -> None:
         calls.append((dataset_id, config, kwargs))
         return {"config": config}
 
-    fake_datasets.load_dataset = fake_load_dataset  # type: ignore[attr-defined]
+    fake_datasets.load_dataset = fake_load_dataset
     monkeypatch.setitem(sys.modules, "datasets", fake_datasets)
 
     loaded = load_enterprise_rag(

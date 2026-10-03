@@ -1,5 +1,3 @@
-"""Installable dual-view memory components used by the research artifact."""
-
 from importlib import import_module
 from typing import Any
 
@@ -27,7 +25,6 @@ _EXPORTS = {
 
 
 def __getattr__(name: str) -> Any:
-    """Lazily load components with optional model or vector-store dependencies."""
     if name not in _EXPORTS:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     module_name, attribute = _EXPORTS[name]
@@ -37,5 +34,4 @@ def __getattr__(name: str) -> Any:
 
 
 def __dir__() -> list[str]:
-    """List core and optional method components without importing backends."""
     return sorted(set(globals()) | set(_EXPORTS))

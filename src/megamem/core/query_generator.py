@@ -58,7 +58,7 @@ class QueryGenerator:
 
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
-        self._model_client = ChatCompletionModel(cfg)  # LLM client for prompt invocations
+        self._model_client = ChatCompletionModel(cfg)
         pass
 
     def generate_queries(
@@ -66,7 +66,6 @@ class QueryGenerator:
         context: str,
     ) -> list[str]:
 
-        # Hand the context to the LLM and parse its structured response.
         prompt_args = {
             "context": context,
         }
@@ -82,15 +81,6 @@ class QueryGenerator:
         self,
         context: str,
     ) -> list[str]:
-        """
-        Pull keywords / short phrases from a context for keyword-style retrieval.
-
-        Args:
-            context: The context to extract keywords from
-
-        Returns:
-            List of keywords and phrases
-        """
         prompt_args = {
             "context": context,
         }

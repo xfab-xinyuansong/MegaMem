@@ -1,5 +1,3 @@
-"""Plan-based memory retrieval."""
-
 import logging
 import re
 import time
@@ -20,7 +18,6 @@ _UNKNOWN = "UNKNOWN"
 
 
 class PlanStep(BaseModel):
-    """A single step in the decomposed retrieval plan."""
     step_id: str = Field(description="Step identifier: 'S1', 'S2', etc.")
     query: str = Field(
         description=(
@@ -40,13 +37,11 @@ class PlanStep(BaseModel):
 
 
 class QueryPlan(BaseModel):
-    """LLM-generated decomposition plan for a complex query."""
     steps: List[PlanStep] = Field(description="Ordered list of 1-4 steps.")
     reasoning: str = Field(description="Brief explanation of the decomposition strategy.")
 
 
 class StepAnswer(BaseModel):
-    """Concise answer extracted from retrieved memories for one plan step."""
     answer: str = Field(
         description=(
             "A concise factual answer extracted from the retrieved memories. "
@@ -180,7 +175,6 @@ INSTRUCTIONS:
 
 
 class PlanBasedRetriever(BaseMemoryRetriever):
-    """Retriever that plans a sequence of dependent sub-queries."""
 
     def __init__(
         self,
@@ -208,7 +202,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
         self.last_trace: List[Dict] = []
 
     def _log_plan(self, plan: QueryPlan, query: str, attempt: int) -> None:
-        """Emit a verbose log of the plan to aid debugging."""
         bar = "=" * 70
         block = [
             "",
@@ -227,7 +220,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
     def _log_step_memories(
         self, step: PlanStep, effective_query: str, memories: List['MemoryEntry'], role: str
     ) -> None:
-        """Dump the per-step retrieved memories into the log."""
         bar = "-" * 60
         block = [
             "",
@@ -245,7 +237,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
         logger.info("\n".join(block))
 
     def _log_final_memories(self, query: str, memories: List['MemoryEntry']) -> None:
-        """Dump the final returned memories into the log."""
         bar = "=" * 70
         block = [
             "",
@@ -268,13 +259,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
         failure_reason: Optional[str] = None,
         latency_tracker=None,
     ) -> QueryPlan:
-        """
-        Ask the LLM for a decomposition plan for ``query``.
-
-        On the first attempt the standard prompt is used. On subsequent
-        retries a different "retry" prompt is used so the LLM is
-        explicitly steered away from the strategy that just failed.
-        """
         if failed_step_id and failure_reason:
             prompt = PLAN_RETRY_PROMPT.format(
                 failed_step_id=failed_step_id,
@@ -324,16 +308,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
 
     @staticmethod
     def _collapse_independent_steps(plan: QueryPlan, original_query: str) -> QueryPlan:
-        """
-        Fold a fully-independent multi-step plan into a single step.
-
-        When every step has ``depends_on=None``, the parallel sub-queries
-        cover overlapping semantic space — running them all just adds
-        retrieval cost without adding information. A single search using
-        the user's original query gives equivalent coverage.
-
-        Plans containing at least one dependency are returned as-is.
-        """
         if len(plan.steps) <= 1:
             return plan
 
@@ -369,20 +343,9 @@ class PlanBasedRetriever(BaseMemoryRetriever):
         memories: List[MemoryEntry],
         latency_tracker=None,
     ) -> Tuple[str, float]:
-        """
-        Pull a short answer out of ``memories`` for substitution into
-        downstream step queries.
-
-        Returns
-        -------
-        (answer, confidence)
-            answer:     extracted string or _UNKNOWN
-            confidence: 0.0-1.0 confidence score (0.0 for UNKNOWN / errors)
-        """
         if not memories:
             return _UNKNOWN, 0.0
 
-        # Trim to the strongest hits before sending to the LLM.
         top_memories = memories[:10]
         memories_text = "\n".join(
             f"[{pos}] {mem.index}: {mem.value or ''}"
@@ -416,7 +379,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
 
     @staticmethod
     def _substitute_placeholders(template: str, resolved: Dict[str, str]) -> str:
-        """Swap ``{S1}``, ``{S2}`` … placeholders for the resolved answer strings."""
         rendered = template
         for step_id, answer in resolved.items():
             rendered = rendered.replace("{" + step_id + "}", answer)
@@ -424,14 +386,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
 
     @staticmethod
     def _extract_entity_from_query(original_query: str, step_query: str) -> str:
-        """
-        Recover the entity reference from the original user query that the
-        pointer step was trying to resolve. Used as a degraded fallback
-        when the LLM cannot extract an answer.
-
-        Example: original query "What country is Caroline's grandma from?"
-        and step query "Who is Caroline's grandma?" → "Caroline's grandma".
-        """
         possessive_match = re.search(
             r"(\w+(?:'s|'s)\s+\w+(?:\s+\w+)?)", original_query
         )
@@ -449,8 +403,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
         latency_tracker,
         original_query: str = "",
     ) -> Tuple[List[MemoryEntry], Optional[str], Optional[str]]:
-        """Run every step of ``plan`` in order."""
-        # Pre-compute the set of step ids that have at least one dependent.
         step_ids_with_dependents: set = {
             s.depends_on for s in plan.steps if s.depends_on
         }
@@ -466,7 +418,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
                 step.query, resolved_answers
             )
 
-            # ---- Run this step's query against the memory store ----
             step_memories: List[MemoryEntry] = []
             query_error: Optional[str] = None
 
@@ -485,7 +436,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
                     f"Step {step.step_id}: query raised exception: {exc}"
                 )
 
-            # ---- Pointer-step failure handling ----
             if is_pointer:
                 self._log_step_memories(step, effective_query, step_memories, "pointer")
 
@@ -513,7 +463,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
                     )
                     return [], step.step_id, failure_reason
 
-                # Resolve a short answer for downstream substitution.
                 answer, confidence = self._extract_answer(
                     effective_query, step_memories, latency_tracker
                 )
@@ -523,7 +472,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
                 )
 
                 if answer == _UNKNOWN:
-                    # Confidence gating: degrade rather than hard-fail.
                     fallback = self._extract_entity_from_query(
                         original_query, effective_query
                     )
@@ -533,8 +481,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
                         f"substitution '{fallback}' and continuing plan"
                     )
                     resolved_answers[step.step_id] = fallback
-                    # Keep the pointer's memories since otherwise the
-                    # context they provide is lost.
                     leaf_memories.extend(step_memories)
 
                     self._record_step(
@@ -546,7 +492,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
                     resolved_answers[step.step_id] = answer
 
             else:
-                # Leaf step — empty hits aren't fatal, just less coverage.
                 if query_error:
                     logger.warning(
                         f"Step {step.step_id} (leaf): query error '{query_error}' — "
@@ -575,7 +520,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
         duration: float,
         latency_tracker,
     ) -> None:
-        """Append one step's outcome to the running trace."""
         step_data = {
             "step": step.step_id,
             "action": "PLAN_STEP",
@@ -604,7 +548,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
         latency_tracker=None,
         **kwargs,
     ) -> List[MemoryEntry]:
-        """Retrieve memories using plan-based decomposition with automatic"""
         self.last_trace = []
 
         if top_k is None:
@@ -620,7 +563,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
         failure_reason: Optional[str] = None
 
         for attempt in range(self.max_plan_retries + 1):
-            # Plan (or re-plan with failure context).
             plan = self._generate_plan(
                 query,
                 failed_step_id=failed_step_id,
@@ -628,7 +570,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
                 latency_tracker=latency_tracker,
             )
 
-            # Fold fully-independent multi-step plans into a single search.
             plan = self._collapse_independent_steps(plan, query)
 
             self._log_plan(plan, query, attempt + 1)
@@ -689,7 +630,6 @@ class PlanBasedRetriever(BaseMemoryRetriever):
                 self._log_final_memories(query, memories)
                 return memories
 
-            # This attempt failed; either retry or fall back.
             if attempt < self.max_plan_retries:
                 logger.warning(
                     f"Plan attempt {attempt + 1}/{self.max_plan_retries + 1} failed "
@@ -722,9 +662,7 @@ class PlanBasedRetriever(BaseMemoryRetriever):
                 self._log_final_memories(query, fallback_memories)
                 return fallback_memories
 
-        # Defensive: the loop above should always return.
         return []
 
     def get_trace(self) -> List[Dict]:
-        """Return the trace recorded by the most recent ``retrieve()`` call."""
         return self.last_trace

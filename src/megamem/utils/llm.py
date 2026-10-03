@@ -26,7 +26,6 @@ def _cfg_get(cfg: Optional[DictConfig], section: str, key: str, default: str = "
 def get_general_chat_completion_client(
     cfg: Optional[DictConfig] = None,
 ) -> GeneralAPIClient:
-    """Build a client for the general model gateway."""
     base_url = os.getenv("LLM_API_BASE") or _cfg_get(cfg, "llm", "api_base")
     api_key = os.getenv("LLM_API_KEY") or _cfg_get(cfg, "llm", "api_key")
     if not base_url or not api_key:
@@ -38,11 +37,6 @@ def get_general_chat_completion_client(
 
 
 class ChatCompletionModel:
-    """Unified chat-completion frontend.
-
-    The default backend is a general chat API. Set ``cfg.llm.backend`` to
-    ``huggingface`` to run a local causal LM instead.
-    """
 
     def __init__(self, cfg: DictConfig, token_usage_callback=None):
         self.cfg = cfg
@@ -60,14 +54,12 @@ class ChatCompletionModel:
             self.hf_tokenizer = None
 
     def _determine_model_type(self, model_name: str) -> str:
-        """Classify the configured backend."""
         backend = str(self.cfg.llm.get("backend", "api")).lower()
         if backend in {"hf", "huggingface", "local"}:
             return "huggingface"
         return "api"
 
     def _load_hf_model(self, model_name: str):
-        """Load a Hugging Face causal LM and tokenizer."""
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -99,7 +91,6 @@ class ChatCompletionModel:
         source: str = "Unknown",
         **kwargs: Any,
     ) -> str:
-        """Run a single completion against the configured backend."""
         if isinstance(input, str):
             rendered = input.format(**prompt_args) if prompt_args else input
             messages = [{"role": "user", "content": rendered}]
@@ -115,7 +106,6 @@ class ChatCompletionModel:
         return self._invoke_api(messages, response_format, source, **kwargs)
 
     def _invoke_hf(self, messages: list, source: str = "Unknown", **kwargs) -> str:
-        """Run a Hugging Face completion with retries on transient errors."""
         import time
         import torch
 
@@ -215,7 +205,6 @@ class ChatCompletionModel:
     def _invoke_api(
         self, messages: list, response_format: Any, source: str, **kwargs
     ) -> str:
-        """Run a general API completion with retries on transient errors."""
         import time
 
         max_retries = 3
@@ -325,5 +314,4 @@ class ChatCompletionModel:
 
 
 def model_name_for_usage(model_name: str) -> str:
-    """Normalize a model identifier for token-usage logs."""
     return str(model_name).replace("hf:", "")

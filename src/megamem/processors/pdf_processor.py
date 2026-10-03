@@ -1,7 +1,3 @@
-"""
-PDF document processor for .pdf files.
-"""
-
 import re
 from statistics import median
 from pathlib import Path
@@ -11,21 +7,11 @@ from megamem.processors.base_processor import FileProcessor, detect_file_type
 
 
 class PDFProcessor(FileProcessor):
-    """Processor for PDF files (.pdf)."""
 
     def can_process(self, file_path: Path) -> bool:
-        """Check if this processor can handle PDF files."""
         return detect_file_type(file_path) == "pdf"
 
     def process(self, file_path: Path) -> List[Segment]:
-        """Convert a PDF into per-paragraph and per-table segments.
-
-        Args:
-            file_path: Path to the PDF file.
-
-        Returns:
-            Ordered list of :class:`Segment` objects.
-        """
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
@@ -45,7 +31,6 @@ class PDFProcessor(FileProcessor):
                     text = page.extract_text()
 
                     if text and text.strip():
-                        # Split page text into paragraphs (blank-line delimited).
                         for para_num, paragraph in enumerate(text.split("\n\n"), 1):
                             stripped = paragraph.strip()
                             if not stripped:
@@ -62,11 +47,9 @@ class PDFProcessor(FileProcessor):
                                 )
                             )
 
-                    # Pull each table out as its own segment.
                     for table_num, table in enumerate(page.extract_tables(), 1):
                         if not table:
                             continue
-                        # Render the table as tab-separated rows.
                         table_text = "\n".join(
                             "\t".join(str(cell) if cell else "" for cell in row)
                             for row in table
@@ -91,14 +74,6 @@ class PDFProcessor(FileProcessor):
             raise ValueError(f"Failed to process PDF file: {exc}")
 
     def extract_header_structure(self, file_path: Path) -> List[Segment]:
-        """Return the PDF's heading hierarchy as ordered header segments.
-
-        Args:
-            file_path: Path to the PDF file.
-
-        Returns:
-            Header segments in reading order.
-        """
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
@@ -141,19 +116,15 @@ class PDFProcessor(FileProcessor):
                 is_top_level_numbered = bool(top_level_re.match(candidate))
                 has_visual_header_signal = is_emphasis or font_size >= body_font_size + 0.6
 
-                # Subsections must have a visual emphasis cue.
                 if is_subsection and not has_visual_header_signal:
                     continue
 
-                # Top-level numbered headings need a stronger visual cue.
                 if is_top_level_numbered and not (is_emphasis or font_size >= body_font_size + 1.5):
                     continue
 
-                # Anything not numbered must at least have a visual cue.
                 if not is_numbered and not has_visual_header_signal:
                     continue
 
-                # Once we enter the references section, only appendices count.
                 if in_references and not candidate.lower().startswith("appendix"):
                     continue
 
@@ -184,17 +155,13 @@ class PDFProcessor(FileProcessor):
         ]
 
     def _normalize_header_text(self, line: str) -> str:
-        """Compact whitespace and re-space leading numbering on a header line."""
         text = re.sub(r"\s+", " ", line.strip())
-        # Insert a space between the section number and the title in three
-        # progressively more permissive forms.
         text = re.sub(r"^(\d+(?:\.\d+)*)(?=[A-Za-z])", r"\1 ", text)
         text = re.sub(r"^(\d+(?:\.\d+)*)\.\s+(?=[A-Za-z])", r"\1 ", text)
         text = re.sub(r"^(\d+(?:\.\d+)*)\.(?=[A-Za-z])", r"\1 ", text)
         return text
 
     def _is_probable_non_header(self, text: str) -> bool:
-        """Heuristic blacklist for lines that almost certainly aren't headers."""
         text_len = len(text)
         if text_len < 4 or text_len > 95:
             return True
@@ -236,11 +203,9 @@ class PDFProcessor(FileProcessor):
         return False
 
     def _looks_like_header(self, line: str) -> bool:
-        """Decide whether ``line`` plausibly represents a section header."""
         text = self._normalize_header_text(line)
         lower = text.lower().strip(" :")
 
-        # Numbered subsections like "2.3.1 Foo bar".
         subsection_match = re.match(r"^(\d+(?:\.\d+){1,3})\s+[A-Z]", text)
         if subsection_match and self._is_valid_section_number(subsection_match.group(1)):
             subsection_title = re.sub(r"^\d+(?:\.\d+){1,3}\s+", "", text).strip()
@@ -256,7 +221,6 @@ class PDFProcessor(FileProcessor):
                 return False
             return True
 
-        # Top-level numbered sections like "1 Introduction".
         section_text = self._prettify_header_text(text)
         section_match = re.match(r"^(\d+)\s+(.+)$", section_text)
         if section_match and self._is_valid_section_number(section_match.group(1)):
@@ -282,16 +246,13 @@ class PDFProcessor(FileProcessor):
         return False
 
     def _header_level(self, line: str) -> int:
-        """Return the heading depth implied by ``line`` (defaults to 1)."""
         text = self._normalize_header_text(line)
         match = re.match(r"^(\d+(?:\.\d+)*)\s+", text)
         if match:
             return match.group(1).count(".") + 1
-        # Roman-numeral or unparseable forms collapse to top level.
         return 1
 
     def _clean_header_text(self, line: str) -> str:
-        """Trim ``line`` after the section prefix down to a clean header title."""
         text = self._normalize_header_text(line)
 
         numbered_match = re.match(r"^(\d+(?:\.\d+){0,3}|[IVXLC]+\.?)(\s+)(.+)$", text)
@@ -302,7 +263,6 @@ class PDFProcessor(FileProcessor):
         remainder = numbered_match.group(3).strip()
 
         cleaned_tokens: List[str] = []
-        # Walk word-by-word and stop on common sentence-internal markers.
         for token in remainder.split():
             if "," in token or ";" in token or "?" in token:
                 break
@@ -319,16 +279,13 @@ class PDFProcessor(FileProcessor):
         return self._prettify_header_text(f"{prefix} {' '.join(cleaned_tokens)}".strip())
 
     def _prettify_header_text(self, text: str) -> str:
-        """Normalize spacing inside a header text snippet."""
         pretty = re.sub(r"\s+", " ", text.strip())
-        # Insert spaces between camel-case / alphanumeric boundaries.
         pretty = re.sub(r"([a-z])([A-Z])", r"\1 \2", pretty)
         pretty = re.sub(r"([A-Za-z])([0-9])", r"\1 \2", pretty)
         pretty = re.sub(r"([0-9])([A-Za-z])", r"\1 \2", pretty)
         return pretty
 
     def _is_valid_section_number(self, section_number: str) -> bool:
-        """Return ``True`` when ``section_number`` looks like a real section index."""
         parts = section_number.split(".")
         if not parts:
             return False
@@ -338,11 +295,9 @@ class PDFProcessor(FileProcessor):
         except ValueError:
             return False
 
-        # Each component must lie within a plausible 1..30 range.
         return all(1 <= v <= 30 for v in values)
 
     def _extract_inline_numbered_candidates(self, line: str) -> List[str]:
-        """Pull header-like fragments that begin partway through ``line``."""
         candidates: List[str] = []
         normalized = self._normalize_header_text(line)
 
@@ -356,7 +311,6 @@ class PDFProcessor(FileProcessor):
         return candidates
 
     def _extract_pymupdf_line_records(self, file_path: Path) -> List[Dict[str, Any]]:
-        """Walk the PDF via PyMuPDF and emit one record per text line."""
         import fitz
 
         records: List[Dict[str, Any]] = []
@@ -365,7 +319,6 @@ class PDFProcessor(FileProcessor):
             for page_index, page in enumerate(document, start=1):
                 page_dict = page.get_text("dict")
                 for block in page_dict.get("blocks", []):
-                    # ``type`` 0 is a text block; skip everything else.
                     if block.get("type") != 0:
                         continue
                     for line in block.get("lines", []):
@@ -400,8 +353,6 @@ class PDFProcessor(FileProcessor):
         return records
 
     def _estimate_body_font_size(self, records: List[Dict[str, Any]]) -> float:
-        """Pick a baseline font size representative of body text."""
-        # Long-ish lines that contain lowercase letters are probably body text.
         sample_sizes: List[float] = [
             float(rec["size"])
             for rec in records

@@ -1,14 +1,3 @@
-"""
-Source Cue Generator
-
-Produces natural-language source descriptions for source-cue index entries.
-Each ingested source (email, document, ...) ends up with one cue-index entry whose
-'index' field is a rich description that can be matched semantically against user queries.
-
-This is a sibling of cue_index_generator.py — that module emits topical cues per
-memory, while this module emits a single source-level cue per source.
-"""
-
 import logging
 from typing import Dict, List, Optional
 
@@ -24,16 +13,12 @@ SOURCE_TYPE_METADATA_KEYS: Dict[str, List[str]] = {
     "mail": ["sender", "subject", "recipients", "date"],
     "doc":  ["author", "title", "date"],
     "teams": ["participants", "topic", "conversation_type", "date"],
-    # Future types (extend as needed)
-    # "calendar":   ["organizer", "title", "attendees", "date"],
 }
 
-# Fallback keys used when data_type is empty or absent from the registry.
 _DEFAULT_METADATA_KEYS: List[str] = ["author", "title", "date"]
 
 
 def get_metadata_keys_for_type(data_type: str) -> List[str]:
-    """Return the metadata keys that matter for the given data_type."""
     return SOURCE_TYPE_METADATA_KEYS.get(data_type, _DEFAULT_METADATA_KEYS)
 
 
@@ -132,24 +117,20 @@ Produce the source description (1-2 sentences, no JSON):
 
 
 class SourceCueDescription(BaseModel):
-    """Structured LLM output: a natural-language source description."""
     description: str = Field(
         description="A 1-2 sentence natural-language description of the source"
     )
 
 
 class SourceCueGenerator:
-    """Produces natural-language source descriptions used as source cue indices."""
 
     def __init__(self, cfg: DictConfig, model_client: Optional[ChatCompletionModel] = None):
         self.cfg = cfg
         self._model_client = model_client or ChatCompletionModel(cfg)
 
     def generate_source_cue(self, source_metadata: Dict[str, str]) -> str:
-        """Render a 1-2 sentence natural-language description of the source."""
         data_type = source_metadata.get("data_type", "")
 
-        # Restrict to keys relevant to this data_type, plus data_type itself.
         allowed_keys = ["data_type"] + get_metadata_keys_for_type(data_type)
         filtered_metadata = {
             field_key: field_value
@@ -157,7 +138,6 @@ class SourceCueGenerator:
             if field_key in allowed_keys and field_value
         }
 
-        # Render filtered metadata as a key-value listing for the prompt.
         metadata_text = "\n".join(
             f"  {key}: {value}" for key, value in filtered_metadata.items()
         )
@@ -179,10 +159,6 @@ class SourceCueGenerator:
             return self._fallback_description(source_metadata)
 
     def _fallback_description(self, source_metadata: Dict[str, str]) -> str:
-        """
-        Template-driven fallback for when the LLM call fails.
-        Yields a reasonable description without involving the LLM.
-        """
         data_type = source_metadata.get("data_type", "source")
         date = source_metadata.get("date", "")
 

@@ -1,5 +1,3 @@
-"""Run the MegaMem command-line interface with ``python -m megamem``."""
-
 from .cli import main
 
 

@@ -1,5 +1,3 @@
-"""LLM-prompted retrieval policy used as a strong, non-trainable baseline."""
-
 from typing import List, Optional
 from omegaconf import DictConfig
 
@@ -38,12 +36,6 @@ Your selection:"""
 
 
 class LLMPolicy:
-    """
-    Prompt-driven baseline policy.
-
-        Uses the configured general chat API model to pick
-        the next retrieval action; not trainable.
-    """
 
     def __init__(
             self,
@@ -57,7 +49,6 @@ class LLMPolicy:
         self.max_primary = max_primary_actions
         self.max_cue = max_cue_actions
 
-        # Last prompt/response retained for debugging only.
         self.last_prompt = None
         self.last_response = None
 
@@ -68,19 +59,6 @@ class LLMPolicy:
         cue_candidates: List[MemoryEntry],
         retrieved_memories: Optional[List[dict]] = None,
     ) -> RetrievalAction:
-        """
-        Pick the next action by prompting the LLM.
-
-        Args:
-            state: Current retrieval state
-            primary_candidates: Available primary memory candidates
-            cue_candidates: Available cue index candidates
-            retrieved_memories: Already retrieved memory contents (for context)
-
-        Returns:
-            The chosen :class:`RetrievalAction`.
-        """
-        # Drop anything already collected.
         already = state.retrieved_memories
         available_primary = [m for m in primary_candidates if m.index not in already]
         available_cue = [m for m in cue_candidates if m.index not in already]
@@ -96,7 +74,7 @@ class LLMPolicy:
             available_actions=self._format_actions(available_primary, available_cue),
         )
 
-        self.last_prompt = prompt  # keep for debugging
+        self.last_prompt = prompt
 
         try:
             response = self.client.chat.completions.create(
@@ -115,11 +93,9 @@ class LLMPolicy:
             return self._fallback_greedy(available_primary, available_cue)
 
     def _format_retrieved(self, retrieved_memories: Optional[List[dict]]) -> str:
-        """Render up to 5 already-retrieved memories for the prompt header."""
         if not retrieved_memories:
             return "(None yet)"
 
-        # Cap entries to keep the prompt small.
         head = retrieved_memories[:5]
         lines = [f"  {pos}. {(m.get('value', '') or '')[:80]}..." for pos, m in enumerate(head, 1)]
 
@@ -134,7 +110,6 @@ class LLMPolicy:
         primary_candidates: List[MemoryEntry],
         cue_candidates: List[MemoryEntry],
     ) -> str:
-        """Render the candidate actions as a numbered list for the LLM."""
 
         lines: list = []
         action_idx = 1
@@ -165,20 +140,18 @@ class LLMPolicy:
         primary_candidates: List[MemoryEntry],
         cue_candidates: List[MemoryEntry],
     ) -> RetrievalAction:
-        """Map the LLM's response back into a :class:`RetrievalAction`."""
         selection = selection.strip().upper()
 
         if "STOP" in selection:
             return RetrievalAction(action_type=ActionType.STOP)
 
         try:
-            # Tolerate minor formatting noise like "1.", "Action 1", etc.
             match = re.search(r'(\d+)', selection)
 
             if not match:
                 raise ValueError("No action number found in {selection}")
 
-            pos = int(match.group()) - 1  # convert to 0-indexed
+            pos = int(match.group()) - 1
 
             num_primary = min(len(primary_candidates), self.max_primary)
             num_cue = min(len(cue_candidates), self.max_cue)
@@ -213,7 +186,6 @@ class LLMPolicy:
         primary_candidates: List[MemoryEntry],
         cue_candidates: List[MemoryEntry],
     ) -> RetrievalAction:
-        """Greedy fallback: pick the highest-scoring candidate."""
         pool: list = []
         pool.extend((m, ActionType.QUERY_PRIMARY_INDEX) for m in primary_candidates[:self.max_primary])
         pool.extend((m, ActionType.QUERY_CUE_INDEX) for m in cue_candidates[:self.max_cue])

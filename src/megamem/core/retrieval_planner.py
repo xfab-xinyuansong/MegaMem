@@ -1,5 +1,3 @@
-"""Retrieval Planner"""
-
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -14,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class RetrievalStep(BaseModel):
-    """One step inside the retrieval plan."""
     step_id: str = Field(description="Step identifier: 'S1', 'S2', etc.")
     op: str = Field(description="Operation: 'FILTER', 'SEMANTIC_SEARCH', or 'RESOLVE'")
     scope: Optional[str] = Field(
@@ -22,7 +19,6 @@ class RetrievalStep(BaseModel):
         description="'all_sources' (default) or 'filtered_results' (operates on output of previous step)"
     )
 
-    # --- Shared metadata fields (available on FILTER and SEMANTIC_SEARCH) ---
     data_type: Optional[str] = Field(
         default=None,
         description="Source type: 'mail', 'doc', or null. Available on FILTER and SEMANTIC_SEARCH."
@@ -36,7 +32,6 @@ class RetrievalStep(BaseModel):
         description="ISO date 'YYYY-MM-DD' upper bound (exclusive). Available on FILTER and SEMANTIC_SEARCH."
     )
 
-    # --- String-filtered fields (post-filtered in Python on FILTER and SS(source_cues)) ---
     sender: Optional[str] = Field(
         default=None,
         description="Sender/author name (lowercase, first name or full name). "
@@ -80,7 +75,6 @@ class RetrievalStep(BaseModel):
                     "Matched via exact value. Use for chat sources when data_type='chat'."
     )
 
-    # --- SEMANTIC_SEARCH fields ---
     query_text: Optional[str] = Field(
         default=None,
         description="For SEMANTIC_SEARCH: semantic query string, stripped of source/temporal qualifiers"
@@ -91,7 +85,6 @@ class RetrievalStep(BaseModel):
                     "or 'primary_memories' (search extracted facts/details for specific information)"
     )
 
-    # --- RESOLVE fields ---
     return_mode: Optional[str] = Field(
         default=None,
         description="For RESOLVE: 'metadata_summary' (return source cue descriptions + metadata fields) "
@@ -105,7 +98,6 @@ class RetrievalStep(BaseModel):
 
 
 class RetrievalPlan(BaseModel):
-    """Plan emitted by the retrieval-planning LLM."""
     normalized_query: str = Field(
         description="Cleaned/restated version of the user query"
     )
@@ -120,17 +112,6 @@ class RetrievalPlan(BaseModel):
         description="Brief explanation of why this plan was chosen"
     )
 
-
-"""
-Based on the below rules:
-possible plans include:
-- FILTER → RESOLVE(metadata_summary)
-- FILTER → RESOLVE(full_content)
-- SEMANTIC_SEARCH(source_cues) → RESOLVE(metadata_summary)
-- SEMANTIC_SEARCH(source_cues) → RESOLVE(full_content)
-- SEMANTIC_SEARCH(source_cues) → SEMANTIC_SEARCH(primary_memories)
-- SEMANTIC_SEARCH(primary_memories)
-"""
 
 PROMPT_RETRIEVAL_PLANNER = """
 
@@ -404,29 +385,12 @@ Produce the retrieval plan.
 
 
 class RetrievalPlanner:
-    """
-    Inspects user queries and emits a step-based execution plan.
-
-    Usage:
-        planner = RetrievalPlanner(cfg)
-        plan = planner.plan("Summarize the email from Sarah last week")
-        # plan.steps → [FILTER(data_type=mail, ...), SEMANTIC_SEARCH(...)]
-    """
 
     def __init__(self, cfg: DictConfig, model_client: Optional[ChatCompletionModel] = None):
         self.cfg = cfg
         self._model_client = model_client or ChatCompletionModel(cfg)
 
     def plan(self, query: str) -> RetrievalPlan:
-        """
-        Build a retrieval plan from a natural-language user query.
-
-        Args:
-            query: Natural language user query
-
-        Returns:
-            RetrievalPlan with ordered steps to execute
-        """
         today = datetime.now().strftime("%Y-%m-%d")
 
         prompt_args = {
@@ -464,7 +428,6 @@ class RetrievalPlanner:
 
 
 def build_where_clause(step: RetrievalStep) -> Optional[Dict]:
-    """Translate a RetrievalStep's flat filter fields into a ChromaDB where clause."""
     conditions: List[Dict] = []
 
     if step.data_type:
@@ -487,7 +450,6 @@ def build_where_clause(step: RetrievalStep) -> Optional[Dict]:
     return {"$and": conditions}
 
 
-# Maps the RetrievalStep attribute name to the output key used in the string filters dict.
 _STRING_FILTER_FIELDS = (
     "sender", "recipients", "author", "title",
     "participants", "topic", "conversation_type",
@@ -495,16 +457,6 @@ _STRING_FILTER_FIELDS = (
 
 
 def get_string_filters(step: RetrievalStep) -> Dict[str, Any]:
-    """
-    Extract the string-based post-filters from a RetrievalStep.
-
-    These get applied in Python after ChromaDB returns its raw results,
-    because ChromaDB's $contains does not do substring matching on metadata.
-    All values are lowercased for case-insensitive matching.
-
-    Returns:
-        Dict with any of: sender, recipients, author, title. Empty dict when no string filters apply.
-    """
     filters: Dict[str, Any] = {}
 
     for attr in _STRING_FILTER_FIELDS:
@@ -519,7 +471,6 @@ def apply_string_filters(
     entries: List,
     string_filters: Dict[str, Any],
 ) -> List:
-    """Apply Python-side substring filters to a list of MemoryEntry objects."""
     if not string_filters:
         return entries
 
@@ -527,43 +478,36 @@ def apply_string_filters(
     for entry in entries:
         extra = entry.extra_metadata or {}
 
-        # sender substring
         if "sender" in string_filters:
             sender_val = (extra.get("sender", "") or "").lower()
             if string_filters["sender"].lower() not in sender_val:
                 continue
 
-        # recipients substring
         if "recipients" in string_filters:
             recip_val = (extra.get("recipients", "") or "").lower()
             if string_filters["recipients"].lower() not in recip_val:
                 continue
 
-        # author substring
         if "author" in string_filters:
             author_val = (extra.get("author", "") or "").lower()
             if string_filters["author"].lower() not in author_val:
                 continue
 
-        # title substring (also looks at "subject")
         if "title" in string_filters:
             title_val = (extra.get("title", "") or extra.get("subject", "") or "").lower()
             if string_filters["title"].lower() not in title_val:
                 continue
 
-        # participants substring
         if "participants" in string_filters:
             participants_val = (extra.get("participants", "") or "").lower()
             if string_filters["participants"].lower() not in participants_val:
                 continue
 
-        # topic substring
         if "topic" in string_filters:
             topic_val = (extra.get("topic", "") or "").lower()
             if string_filters["topic"].lower() not in topic_val:
                 continue
 
-        # conversation_type exact match
         if "conversation_type" in string_filters:
             ct_val = (extra.get("conversation_type", "") or "").lower()
             if ct_val != string_filters["conversation_type"].lower():
@@ -575,7 +519,6 @@ def apply_string_filters(
 
 
 def _date_to_unix(date_str: str) -> int:
-    """Convert a YYYY-MM-DD date string into a Unix timestamp; returns 0 on failure."""
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d")
         return int(dt.timestamp())
@@ -588,7 +531,6 @@ def resolve_source_cues(
     return_mode: str,
     metadata_fields: Optional[List[str]] = None,
 ) -> List[MemoryEntry]:
-    """Return deduplicated source-cue entries for a RESOLVE step."""
     memory_type = (
         "resolve_list" if return_mode == "metadata_summary"
         else "resolve_content"
@@ -626,15 +568,6 @@ def resolve_source_cues(
 
 
 def merge_where_clauses(clause_a: Optional[Dict], clause_b: Optional[Dict]) -> Optional[Dict]:
-    """
-    Combine two ChromaDB where clauses into a single $and clause.
-    Flattens nested $and conditions so we don't end up with deeply nested dicts.
-
-    SS steps use this to pair their own data_type/timestamps filter with
-    FILTER's accumulated where clause.
-
-    Returns None when both inputs are None.
-    """
     if not clause_a:
         return clause_b
     if not clause_b:
@@ -650,7 +583,6 @@ def merge_where_clauses(clause_a: Optional[Dict], clause_b: Optional[Dict]) -> O
 
 
 def build_source_cue_filter(accumulated_where: Optional[Dict]) -> Dict:
-    """Combine a FILTER's accumulated where clause with the source-cue restriction."""
     source_cue_where = {"cue_type": {"$eq": "source"}}
     if not accumulated_where:
         return source_cue_where

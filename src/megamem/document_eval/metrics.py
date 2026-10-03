@@ -1,4 +1,3 @@
-"""5 metrics for EnterpriseRAG-style document eval:"""
 from __future__ import annotations
 
 import json
@@ -25,7 +24,6 @@ def _tokens(s: str) -> List[str]:
 
 
 def bleu_score(pred: str, gold: str) -> float:
-    """Smoothed sentence-BLEU using nltk; matches LoCoMo's metrics/utils.py."""
     try:
         from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
     except ImportError:
@@ -43,7 +41,6 @@ def bleu_score(pred: str, gold: str) -> float:
 
 
 def f1_score(pred: str, gold: str) -> float:
-    """Token-level F1, common in QA evaluation."""
     pred_toks = _tokens(pred)
     gold_toks = _tokens(gold)
     if not pred_toks or not gold_toks:
@@ -92,7 +89,6 @@ def llm_judge_score(
     gold: str,
     pred: str,
 ) -> Dict[str, Any]:
-    """LLM-as-judge scoring with the configured judge model."""
     if not pred or pred.strip().lower() == "i don't have enough information to answer.":
         return {"score": 0, "reasoning": "no answer"}
     try:
@@ -112,11 +108,6 @@ def llm_judge_score(
 
 
 def doc_recall(retrieved_doc_ids: List[str], expected_doc_ids: List[str]) -> float:
-    """|retrieved ∩ expected| / |expected|. NaN-safe.
-
-    "doc_recall replaces session_recall for EnterpriseRAG
-    which has no session concept".
-    """
     expected = set(expected_doc_ids or [])
     retrieved = set(retrieved_doc_ids or [])
     if not expected:
@@ -125,7 +116,6 @@ def doc_recall(retrieved_doc_ids: List[str], expected_doc_ids: List[str]) -> flo
 
 
 def _facts_present(fact: str, evidence_text: str, min_overlap: float = 0.5) -> bool:
-    """Heuristic: fact's content tokens overlap with evidence by >= min_overlap fraction."""
     f_tokens = set(_tokens(fact))
     e_tokens = set(_tokens(evidence_text))
     if not f_tokens:
@@ -140,17 +130,11 @@ def text_recall(
     *,
     fallback_gold: str = "",
 ) -> float:
-    """Fraction of answer_facts covered by evidence_text (token-overlap heuristic).
-
-    If answer_facts is empty, fall back to gold-vs-evidence token recall:
-        |gold_tokens ∩ evidence_tokens| / |gold_tokens|.
-    """
     if answer_facts:
         if not evidence_text:
             return 0.0
         present = sum(1 for f in answer_facts if _facts_present(f, evidence_text))
         return present / len(answer_facts)
-    # Fallback: gold-token recall against evidence
     g_tokens = set(_tokens(fallback_gold))
     e_tokens = set(_tokens(evidence_text))
     if not g_tokens:

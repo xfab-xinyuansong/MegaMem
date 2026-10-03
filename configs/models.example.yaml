@@ -1,15 +1,6 @@
-# Model Aliases (example)
-#
-# Every hosted alias uses the public provider value `general` and resolves to one
-# configured model gateway. If a required alias is missing, the runner fails
-# loudly; it must never silently substitute a different model family.
-#
-# Copy this file to `configs/models.yaml` and fill in your own model names.
-# Raw API keys should stay in environment variables, never in YAML.
 
 aliases:
   chat_low:
-    # Low-cost calls: chunk summaries, cheap routing signals, and prefilters.
     provider: general
     base_url_env: "LLM_API_BASE"
     api_key_env: "LLM_API_KEY"
@@ -19,7 +10,6 @@ aliases:
     notes: "Used for high-volume build calls."
 
   chat_high:
-    # Higher-quality calls: hierarchy abstraction, complex routing, final answers.
     provider: general
     base_url_env: "LLM_API_BASE"
     api_key_env: "LLM_API_KEY"
@@ -29,7 +19,6 @@ aliases:
     notes: "Swap this alias explicitly when replaying runs with a different model."
 
   judge:
-    # Judge-based metrics and citation-grounded scoring.
     provider: general
     base_url_env: "LLM_API_BASE"
     api_key_env: "LLM_API_KEY"
@@ -39,7 +28,6 @@ aliases:
     notes: "Keep fixed across comparisons whenever possible."
 
   secondary_extraction:
-    # Optional second endpoint for extraction-heavy runs.
     provider: general
     base_url_env: "SECONDARY_LLM_API_BASE"
     api_key_env: "SECONDARY_LLM_API_KEY"

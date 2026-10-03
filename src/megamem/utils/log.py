@@ -8,11 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 def log_segments(segments: Segment) -> None:
-    """Emit a single info log line listing each segment's heading.
-
-    Args:
-        segments: iterable of segments to summarise.
-    """
     logger.info("### Logging segments:")
     body = ""
     for pos, seg in enumerate(segments):
@@ -22,7 +17,6 @@ def log_segments(segments: Segment) -> None:
 
 
 def configure_logging(log_level: str = "INFO", log_dir: Optional[str] = None):
-    """Configure root logging for the application."""
     import os
     from datetime import datetime
 
@@ -67,7 +61,6 @@ def log_memory_operation(
     entry: MemoryEntry,
     user_id: str,
 ) -> None:
-    """Emit a uniformly formatted log entry for a memory-store operation."""
     log_message = (
         "\n" + "-" * 60 + "\n"
         f"MEMORY STORE: {operation_type}|{entry.creation_time}|{user_id}\n"

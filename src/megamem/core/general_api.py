@@ -1,10 +1,3 @@
-"""General JSON model-gateway client used by MegaMem.
-
-The client implements the small chat and embedding surface MegaMem needs
-without binding the package to a cloud vendor or vendor SDK. Endpoints,
-models, authentication, and routing remain deployment configuration.
-"""
-
 from __future__ import annotations
 
 import json
@@ -18,15 +11,15 @@ from requests.adapters import HTTPAdapter
 
 
 class GeneralAPIError(RuntimeError):
-    """Raised when a general model-gateway request cannot be completed."""
+    pass
 
 
 class GeneralBadRequestError(GeneralAPIError):
-    """Raised for a non-retryable 4xx gateway response."""
+    pass
 
 
 class GeneralContentFilterError(GeneralAPIError):
-    """Raised when the gateway reports a filtered completion."""
+    pass
 
 
 @dataclass(frozen=True)
@@ -74,7 +67,6 @@ class GeneralEmbeddingResponse:
 
 
 def build_general_session(pool_max: int = 256, pool_connections: int = 128):
-    """Create a requests session with bounded connection pools."""
     session = requests.Session()
     adapter = HTTPAdapter(
         pool_connections=pool_connections,
@@ -158,7 +150,6 @@ class _Embeddings:
 
 
 class GeneralAPIClient:
-    """Client for the MegaMem general chat and embedding contract."""
 
     provider = "general"
 

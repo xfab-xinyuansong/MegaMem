@@ -1,10 +1,3 @@
-"""
-LLM-driven extractors for DDI distilled memories and CDM cognitive entries.
-
-Both extractors return structured JSON; on parsing failure we silently fall
-back to "no extractions" rather than crashing — this is consistent with
-Solution2's AgentMemory distillation policy.
-"""
 from __future__ import annotations
 
 import json
@@ -54,7 +47,6 @@ def extract_distilled_memories(
     source_type: str,
     raw_text: str,
 ) -> List[DistilledMemoryEntry]:
-    """Call the chat model to extract distilled memories from a single chunk."""
     if not raw_text.strip():
         return []
     sys = DISTILL_PROMPT_SYSTEM.format(budget=cfg.distilled_memory_per_chunk_budget)
@@ -116,7 +108,7 @@ COGNITIVE_TYPES = [
     "risk",
     "recommendation",
     "example",
-    "conflict",  # cross-doc; skip in single-chunk extraction
+    "conflict",
     "version_update",
 ]
 COGNITIVE_SINGLE_CHUNK_TYPES = [t for t in COGNITIVE_TYPES if t != "conflict"]
@@ -204,7 +196,7 @@ def extract_cognitive_relations(
             conf = 0.7
         if not val:
             continue
-        if conf < 0.5:  # confidence floor
+        if conf < 0.5:
             continue
         index = " | ".join(x for x in [subj, rel, obj] if x).strip() or val[:80]
         out.append(
@@ -250,14 +242,9 @@ def summarize_section(
     *,
     min_tokens_for_llm: int = 1000,
 ) -> str:
-    """Generate or fall back for section summary.
-
-    If section is short (< min_tokens_for_llm), use raw text (truncated) directly.
-    """
     from megamem.document_eval.chunking import count_tokens
 
     if count_tokens(body) < min_tokens_for_llm:
-        # Use raw text, truncate to ~150 tokens worth (chars approx)
         return (body[:600]).strip()
     try:
         return chat_completion(
@@ -292,7 +279,6 @@ def summarize_document(
 ) -> str:
     if not section_summaries:
         return title or ""
-    # If only 1 section, use that summary directly.
     if len(section_summaries) == 1:
         return section_summaries[0]
     joined = "\n- " + "\n- ".join(s for s in section_summaries[:20])
@@ -366,11 +352,6 @@ def extract_combined_distilled_and_cognitive(
     source_type: str,
     raw_text: str,
 ) -> tuple:
-    """Single-LLM-call extractor that returns (distilled_list, cognitive_list).
-
-    Mirrors the return shape of extract_distilled_memories + extract_cognitive_relations
-    so callers can swap implementations behind a config flag.
-    """
     if not raw_text.strip():
         return [], []
     sys_prompt = COMBINED_PROMPT_SYSTEM.format(
@@ -384,7 +365,7 @@ def extract_combined_distilled_and_cognitive(
                 {"role": "user", "content": f"Document chunk (section: {section_path}):\n\n{raw_text[:6000]}"},
             ],
             response_format_json=True,
-            max_tokens=1500,  # bumped vs single-task extractors to fit both outputs
+            max_tokens=1500,
         )
         data = json.loads(resp) if resp else {"memories": [], "relations": []}
     except Exception as exc:
@@ -394,7 +375,6 @@ def extract_combined_distilled_and_cognitive(
     if not isinstance(data, dict):
         return [], []
 
-    # --- Parse distilled list (same logic as extract_distilled_memories) ---
     distilled_out: List[DistilledMemoryEntry] = []
     for i, m in enumerate(data.get("memories", [])[: cfg.distilled_memory_per_chunk_budget]):
         if not isinstance(m, dict):
@@ -423,7 +403,6 @@ def extract_combined_distilled_and_cognitive(
             )
         )
 
-    # --- Parse cognitive list (same logic as extract_cognitive_relations) ---
     cognitive_out: List[CognitiveEntry] = []
     for i, r in enumerate(data.get("relations", [])[:4]):
         if not isinstance(r, dict):

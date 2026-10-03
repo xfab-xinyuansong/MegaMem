@@ -17,30 +17,24 @@ from megamem.builder.memory_builder import (
 )
 
 
-# Initialize module logger
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class NormalizedChatMessage:
-    """Provider-agnostic chat/Teams message representation.
-
-    Parsers for specific formats (Microsoft Graph Teams, Slack, etc.) should
-    convert their raw data into this structure before passing to add_chats.
-    """
     message_id: str
-    body_text: str = ""               # plain text (HTML already stripped)
+    body_text: str = ""
     sender_name: str = ""
-    sender_address: str = ""          # email address of sender
-    sent_datetime: str = ""           # ISO 8601 format
-    to_recipients: List[Dict[str, str]] = field(default_factory=list)  # [{"name": ..., "address": ...}]
+    sender_address: str = ""
+    sent_datetime: str = ""
+    to_recipients: List[Dict[str, str]] = field(default_factory=list)
     cc_recipients: List[Dict[str, str]] = field(default_factory=list)
     subject: str = ""
-    conversation_id: str = ""         # thread grouping key
-    thread_id: str = ""               # thread identifier
-    topic: str = ""                   # thread/channel topic
-    conversation_type: str = ""       # e.g. "meeting", "chat", "channel"
-    thread_type: str = ""             # e.g. "meeting", "chat"
+    conversation_id: str = ""
+    thread_id: str = ""
+    topic: str = ""
+    conversation_type: str = ""
+    thread_type: str = ""
     importance: str = "Normal"
     has_attachments: bool = False
     mentions: List[Dict] = field(default_factory=list)
@@ -48,7 +42,6 @@ class NormalizedChatMessage:
     links: List[str] = field(default_factory=list)
 
 
-# LLM prompt for episodic memory generation
 PROMPT_EPISODIC_MEMORY = """
 You are an expert episodic memory generator that creates episodic memory summaries from conversation segments.
 
@@ -100,33 +93,19 @@ class ChatMemoryBuilder(MemoryBuilder):
         content: Optional[Union[str, Dict]],
         metadata: Optional[Dict],
     ) -> List[MemoryEntry]:
-        """Extract memory entries from a chat segment.
 
-        Args:
-            content: Normalized content (text or dict).
-
-        Returns:
-            Memory entries extracted from ``content``.
-
-        Note:
-            Cue indices are produced by the same LLM call as primary indices.
-        """
-
-        # Pull the indexed message list out of the normalized payload.
         segment_messages = content.get("segment_messages") if isinstance(content, dict) else None
 
         if not segment_messages:
             logger.warning("No segment_messages in content, cannot use turn-based extraction")
             return []
 
-        # Resolve the timestamp string (strip any preceding "...on " prefix).
         ts = metadata.get("timestamp", "N/A") if metadata else "N/A"
         if " on " in ts:
             ts = ts.split(" on ")[-1]
 
         content_text = content.get("text", "") if isinstance(content, dict) else content
 
-        # Run the turn-based extraction prompt.
         memories_with_turns = self._model_client.invoke(
             input=PROMPT_BUILD_MEMORY,
             prompt_args={
@@ -139,7 +118,6 @@ class ChatMemoryBuilder(MemoryBuilder):
         memory_entries: List[MemoryEntry] = []
         for pos, mem_out in enumerate(memories_with_turns.entries):
             try:
-                # Pull the actual conversation text for the requested turns.
                 extracted_value = self._extract_text_from_turns(
                     segment_messages,
                     mem_out.turn_ranges,
@@ -151,7 +129,6 @@ class ChatMemoryBuilder(MemoryBuilder):
 
                 logger.debug(f"  Memory {pos+1} extracted value (first 200 chars):\n    {extracted_value[:200]}...")
 
-                # Format cue indices supplied by the LLM (validated/deduped first).
                 cue_indices_str = ""
                 if mem_out.cue_indices:
                     validated_cues = self._validate_cue_indices(
@@ -160,7 +137,6 @@ class ChatMemoryBuilder(MemoryBuilder):
                     )
                     cue_indices_str = "||".join(validated_cues)
 
-                # Forward any extra metadata keys not already consumed by MemoryEntry.
                 _consumed_keys = {
                     "creation_time", "timestamp", "episodic_memory_id",
                     "segment_topic", "segment_index", "image_urls",
@@ -175,7 +151,7 @@ class ChatMemoryBuilder(MemoryBuilder):
                 entry = MemoryEntry(
                     memory_type="factual",
                     index=mem_out.index,
-                    value=extracted_value,  # raw conversation snippet, not LLM-rewritten
+                    value=extracted_value,
                     creation_time=metadata["creation_time"],
                     timestamp=metadata.get("timestamp", ""),
                     cue_indices=cue_indices_str,
@@ -184,7 +160,6 @@ class ChatMemoryBuilder(MemoryBuilder):
                 )
                 memory_entries.append(entry)
             except Exception as exc:
-                # Best-effort identifier when the entry itself failed to parse.
                 idx_label = getattr(mem_out, 'index', f'memory_{pos+1}')
                 logger.error(f"Failed to extract turns for '{idx_label}': {exc}")
                 continue
@@ -194,7 +169,6 @@ class ChatMemoryBuilder(MemoryBuilder):
             f"from {len(memories_with_turns.entries)} LLM outputs\n{'='*80}\n"
         )
 
-        # Defensive: tag every entry as factual.
         for entry in memory_entries:
             entry.memory_type = "factual"
 
@@ -205,19 +179,7 @@ class ChatMemoryBuilder(MemoryBuilder):
         content: Optional[Union[str, Dict]],
         metadata: Optional[Dict],
     ) -> Optional[MemoryEntry]:
-        """Build a high-level episodic summary via the LLM.
-
-        Args:
-            content: Conversation payload (text or multimodal dict from
-                :func:`normalize_content`).
-            metadata: Extra metadata to attach to the resulting entry.
-
-        Returns:
-            A new episodic ``MemoryEntry`` or ``None`` if extraction failed.
-        """
         try:
-            # After normalize_content the payload is either a string or a
-            # dict with a "text" field; pick the textual portion either way.
             content_text = content["text"] if isinstance(content, dict) and "text" in content else content
 
             episodic_output = self._model_client.invoke(
@@ -246,20 +208,10 @@ class ChatMemoryBuilder(MemoryBuilder):
         segment_messages: List[Dict[str, Any]],
         turn_ranges: List,
     ) -> str:
-        """Concatenate the text content of selected conversation turns.
-
-        Args:
-            segment_messages: Ordered message dicts (role + content).
-            turn_ranges: TurnRange objects (1-based, inclusive).
-
-        Returns:
-            The combined text from the requested turns, joined by newlines.
-        """
         extracted_parts: List[str] = []
         n_msgs = len(segment_messages)
 
         for tr in turn_ranges:
-            # Convert 1-based inclusive bounds to 0-based list indices.
             start = tr.start_turn - 1
             end = tr.end_turn - 1
 
@@ -276,12 +228,10 @@ class ChatMemoryBuilder(MemoryBuilder):
                 )
                 start, end = end, start
 
-            # Walk every selected turn (indices already 0-based here).
             for pos in range(start, end + 1):
                 msg = segment_messages[pos]
                 msg_content = msg.get("content", "")
 
-                # Multimodal turns arrive as a list of typed parts; flatten the text.
                 if isinstance(msg_content, list):
                     text_chunks = [
                         part.get("text", "")
@@ -292,7 +242,6 @@ class ChatMemoryBuilder(MemoryBuilder):
                 else:
                     text_content = msg_content
 
-                # The speaker name is already embedded by add.py, so no role prefix.
                 extracted_parts.append(text_content)
 
         return "\n".join(extracted_parts)
@@ -302,7 +251,6 @@ class ChatMemoryBuilder(MemoryBuilder):
         cue_indices: List[str],
         primary_index: str,
     ) -> List[str]:
-        """Clean LLM-generated cue indices and cap the list at 3."""
         validated: List[str] = []
         seen: set = set()
         primary_lower = primary_index.lower()
@@ -315,17 +263,14 @@ class ChatMemoryBuilder(MemoryBuilder):
 
             cue_lower = cue.lower()
 
-            # Drop cues that duplicate something we already kept.
             if cue_lower in seen:
                 logger.debug(f"Skipping duplicate cue index: '{cue}'")
                 continue
 
-            # Drop cues that simply restate the primary index.
             if cue_lower == primary_lower:
                 logger.debug(f"Skipping cue index that matches primary index: '{cue}'")
                 continue
 
-            # Drop overly short cues (need at least 2 words for context).
             if len(cue.split()) < 2:
                 logger.debug(f"Skipping single-word cue index: '{cue}'")
                 continue
@@ -333,5 +278,4 @@ class ChatMemoryBuilder(MemoryBuilder):
             seen.add(cue_lower)
             validated.append(cue)
 
-        # Per guidelines, keep at most three cue indices per memory.
         return validated[:3]

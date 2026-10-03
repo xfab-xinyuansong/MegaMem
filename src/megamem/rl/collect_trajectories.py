@@ -1,6 +1,3 @@
-"""Driver that walks every QA pair in the LoCoMo split and gathers a group
-of retrieval trajectories per query for downstream GRPO training."""
-
 import sys
 from pathlib import Path
 import hydra
@@ -20,15 +17,6 @@ def collect_all_trajectories(
     G: int = 4,
     output_path: str = None,
 ):
-    """
-    Collect a group of ``G`` trajectories for every QA pair.
-
-    Args:
-        cfg: Hydra config
-        qa_pairs: List of QAPair objects
-        G: Number of trajectories per query
-        output_path: Where to save trajectories
-    """
     rl_cfg = cfg.get("rl", {})
     collector = TrajectoryCollector(
         cfg=cfg,
@@ -64,7 +52,6 @@ def collect_all_trajectories(
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
-    """Hydra entry point for trajectory collection."""
 
     data_path = str(Path(__file__).parent.parent / "data" / "locomo10.json")
     train_data, val_data, _test_data = load_and_split_locomo(data_path)
@@ -79,7 +66,7 @@ def main(cfg: DictConfig):
     output_dir = Path(__file__).parent / "trajectories"
     output_dir.mkdir(exist_ok=True)
 
-    G = cfg.get("rl", {}).get("G", 4)  # trajectories per query
+    G = cfg.get("rl", {}).get("G", 4)
     print(f"\n=== Collecting {G} trajectories per query ===")
 
     train_trajectories = collect_all_trajectories(

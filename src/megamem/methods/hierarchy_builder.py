@@ -1,4 +1,3 @@
-"""MegaMem source-level dual-view node builder."""
 from __future__ import annotations
 
 import logging
@@ -39,7 +38,6 @@ DISTILL_USER_TEMPLATE = """L0 record body:
 Distilled summary:"""
 
 
-# Module-level general client cache
 _GENERAL_CLIENT = None
 _ENC = None
 
@@ -52,7 +50,6 @@ def _get_enc():
 
 
 def _ensure_general_client():
-    """Singleton general API client with an enlarged connection pool."""
     global _GENERAL_CLIENT
     if _GENERAL_CLIENT is not None:
         return _GENERAL_CLIENT
@@ -75,16 +72,10 @@ def _ensure_general_client():
 
 
 def _read_api_key(spec: Dict[str, Any]) -> str:
-    """Read a key only from the environment named by the public alias spec."""
     return os.environ.get(spec.get("api_key_env", "LLM_API_KEY"), "")
 
 
 def llm_distill_one(body: str, max_retries: int = 4) -> Dict[str, Any]:
-    """Call the configured low-tier model for one distilled summary.
-
-    Returns dict with:
-        text, input_tokens, output_tokens, wall_seconds, success, error
-    """
     spec = resolve("chat_low")
     client = _ensure_general_client()
     enc = _get_enc()
@@ -149,15 +140,6 @@ def build_l0_dualnodes(
     progress_cb: Optional[Callable[[int, int], None]] = None,
     alias_status_tag: str = "",
 ) -> List[DualNode]:
-    """Build a DualNode per L0 record. L0 records are dicts like
-        {node_id, tenant_id, canonical_label, level_specific.raw_text,
-         level_specific.evidence_span_id (or source_evidence_span_ids)}
-
-    Returns a list of DualNodes (one per input record). Failed-to-distill
-    records still produce a DualNode but with `distilled_text == ""` and the
-    error captured in `extra["distill_error"]`. Contract validation will catch
-    these nodes and fail the run.
-    """
     enc = _get_enc()
 
     def _node_body_and_meta(rec: Dict[str, Any]) -> Dict[str, Any]:
@@ -165,7 +147,6 @@ def build_l0_dualnodes(
         ls = rec.get("level_specific", {}) or {}
         raw = ls.get("raw_text", "") if isinstance(ls, dict) else ""
         body = label + ("\n" + raw if raw else "")
-        # Collect provenance: evidence_span_id from level_specific, else node_id self-ref
         ev_ids: List[str] = []
         if isinstance(ls, dict):
             esid = ls.get("evidence_span_id")

@@ -1,9 +1,3 @@
-"""
-megamem.browser CLI
-
-Command-line front end for the memory browser tooling.
-"""
-
 import os
 import sys
 import argparse
@@ -18,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
-    """Construct and return the CLI ``argparse`` parser."""
     parser = argparse.ArgumentParser(
         description="megamem Browser - Interactive exploration of ChromaDB memory stores",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -63,14 +56,12 @@ Examples:
 
 
 def _dump_json(payload, path: str) -> None:
-    """Persist ``payload`` as pretty-printed JSON at ``path``."""
     import json
     with open(path, 'w', encoding='utf-8') as fh:
         json.dump(payload, fh, indent=2, ensure_ascii=False)
 
 
 def _print_search_results(payload: dict) -> None:
-    """Render a brief, console-friendly view of a ``search_and_analyze`` payload."""
     print(f"\n📊 Search Results:")
     print(f"Query: {payload['query']}")
     print(f"Total Results: {payload['total_results']}")
@@ -88,7 +79,6 @@ def _print_search_results(payload: dict) -> None:
 
 
 def _print_summary(summary: dict) -> None:
-    """Render a brief textual summary of the collection."""
     print("📊 Memory Summary:")
     print(f"Collection: {summary['collection_name']}")
     coll_stats = summary['statistics']
@@ -100,7 +90,6 @@ def _print_summary(summary: dict) -> None:
 
 
 def main():
-    """Entry point for the memory browser CLI."""
     opts = _build_arg_parser().parse_args()
 
     configure_logging()

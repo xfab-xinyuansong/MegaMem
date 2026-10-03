@@ -1,8 +1,3 @@
-# Model Aliases (example)
-#
-# Every hosted alias uses the public provider value `general` and resolves to one
-# configured model gateway. If a required alias is missing, the runner fails
-# loudly; it must never silently substitute a different model family.
 
 aliases:
   chat_low:

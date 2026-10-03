@@ -1,4 +1,3 @@
-"""Option E (combined distilled+cognitive prompt) quality preflight."""
 from __future__ import annotations
 
 import argparse
@@ -35,16 +34,11 @@ def run_preflight(
     cfg,
     n_docs: int = 10,
 ) -> Dict[str, Any]:
-    """For each of n_docs, segment and run both extractors on each chunk.
-
-    Returns dict with per-mode counts + verdict.
-    """
     from megamem.document_eval.chunking import segment_document
 
     docs = docs[:n_docs]
     logger.info(f"Option E preflight on {len(docs)} docs")
 
-    # 1. Segment (deterministic, same chunks for both modes)
     all_chunk_meta: List[Dict[str, Any]] = []
     for d in docs:
         doc_id = d["doc_id"]
@@ -70,7 +64,6 @@ def run_preflight(
                 })
     logger.info(f"Segmented to {len(all_chunk_meta)} chunks across {len(docs)} docs")
 
-    # 2. Run separate-call mode
     t0 = time.time()
     sep_distilled: list = []
     sep_cognitive: list = []
@@ -83,7 +76,6 @@ def run_preflight(
         f"Separate-call mode: {len(sep_distilled)} distilled + {len(sep_cognitive)} cognitive in {sep_seconds:.1f}s"
     )
 
-    # 3. Run combined-call mode
     t0 = time.time()
     cmb_distilled: list = []
     cmb_cognitive: list = []
@@ -96,7 +88,6 @@ def run_preflight(
         f"Combined-call mode: {len(cmb_distilled)} distilled + {len(cmb_cognitive)} cognitive in {cmb_seconds:.1f}s"
     )
 
-    # 4. Per-type stats
     def _ctype_dist(entries: list) -> Dict[str, int]:
         cnt: Dict[str, int] = collections.Counter()
         for e in entries:
@@ -108,7 +99,6 @@ def run_preflight(
     sep_dt = _ctype_dist(sep_distilled)
     cmb_dt = _ctype_dist(cmb_distilled)
 
-    # 5. Verdict
     def _safe_ratio(a, b):
         return float(a) / float(b) if b else (1.0 if a == 0 else float("inf"))
 
@@ -196,7 +186,6 @@ def main() -> int:
         tier = pd.read_parquet(args.tier_manifest)
         keep = set(tier["doc_id"].tolist())
         docs_df = docs_df[docs_df["doc_id"].isin(keep)].copy()
-    # Stable subsampling by seed
     docs_df = docs_df.sample(n=min(args.n_docs, len(docs_df)), random_state=args.seed).reset_index(drop=True)
     docs = [
         {
@@ -218,7 +207,7 @@ def main() -> int:
         use_local_embedding=True,
         chunk_target_tokens=400,
         distilled_memory_per_chunk_budget=3,
-        use_combined_distilled_cognitive_prompt=False,  # we toggle manually inside
+        use_combined_distilled_cognitive_prompt=False,
     )
 
     result = run_preflight(docs, cfg, n_docs=args.n_docs)

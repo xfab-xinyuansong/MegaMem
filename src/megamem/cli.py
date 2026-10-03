@@ -1,5 +1,3 @@
-"""Command-line interface for MegaMem."""
-
 from __future__ import annotations
 
 import argparse
@@ -42,7 +40,6 @@ _REQUIRED_MODEL_ALIASES = {"chat_low", "chat_high", "judge"}
 
 
 def _show_config(_args: argparse.Namespace) -> int:
-    """Print the active model config and its non-secret alias mapping."""
     from .methods.configs.model_resolver import list_aliases, models_config_path
 
     print(f"Model config: {models_config_path()}")
@@ -52,7 +49,6 @@ def _show_config(_args: argparse.Namespace) -> int:
 
 
 def _doctor_report() -> dict[str, Any]:
-    """Collect local readiness information without making network requests."""
     from .methods.configs.model_resolver import list_aliases, models_config_path
 
     python_supported = sys.version_info >= (3, 11)
@@ -62,7 +58,7 @@ def _doctor_report() -> dict[str, Any]:
     try:
         config_path = str(models_config_path())
         aliases = list_aliases()
-    except Exception as exc:  # diagnostics should report configuration failures
+    except Exception as exc:
         config_error = str(exc)
 
     model_markers = ("PLACEHOLDER", "UNRESOLVED", "INVALID")
@@ -114,7 +110,6 @@ def _run_doctor(args: argparse.Namespace) -> int:
 
 
 def _dispatch_browser(args: argparse.Namespace) -> int:
-    """Forward the browser subcommand to the dedicated module CLI."""
     from .browser.__main__ import main as browser_main
 
     forwarded: list[str] = [args.db_path]
@@ -198,7 +193,6 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the CLI and return a process exit code."""
     from .utils.log import configure_logging
 
     parser = _build_parser()

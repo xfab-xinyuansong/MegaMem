@@ -1,5 +1,3 @@
-"""Hybrid retrieval: reformulation + on-demand decomposition."""
-
 import json
 import logging
 import time
@@ -23,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 class HybridQueryResult(BaseModel):
-    """Combined reformulation + optional decomposition output."""
     search_query: str = Field(
         description=(
             "An optimized search query rewritten from the user's question. "
@@ -60,7 +57,6 @@ class HybridQueryResult(BaseModel):
 
 
 class CueScanResult(BaseModel):
-    """LLM output selecting relevant cues from the full cue inventory."""
     selected_indices: List[int] = Field(
         default_factory=list,
         description="0-based indices of cues that are cognitively relevant to the trigger.",
@@ -72,7 +68,6 @@ class CueScanResult(BaseModel):
 
 
 class PostFilterScore(BaseModel):
-    """Score for a single memory in post-filter."""
     index: str = Field(description="The memory index (exact text from the list).")
     score: int = Field(
         description="Cognitive relevance: 3=strong link, 2=plausible link, 1=no link.",
@@ -81,7 +76,6 @@ class PostFilterScore(BaseModel):
 
 
 class PostFilterResponse(BaseModel):
-    """LLM output scoring all candidate memories."""
     scores: List[PostFilterScore] = Field(
         description="One score per memory, same order as input."
     )
@@ -275,7 +269,6 @@ rephrase the original. Keep each expansion between 3 and 12 words.
 
 
 class HybridRetriever(BaseMemoryRetriever):
-    """Single-LLM-call retriever that fuses query reformulation with"""
 
     def __init__(
         self,
@@ -317,14 +310,6 @@ class HybridRetriever(BaseMemoryRetriever):
         query: str,
         latency_tracker=None,
     ) -> HybridQueryResult:
-        """
-        Single LLM round-trip that handles query rewriting, the
-        decomposition decision, and (optionally) commonsense-expanded
-        retrieval probes — all at once.
-
-        Any failure degrades gracefully: a fallback result echoes the
-        original query with no decomposition.
-        """
         try:
             if self.enable_query_expansion:
                 expansion_instruction = _EXPANSION_INSTRUCTION
@@ -385,7 +370,6 @@ class HybridRetriever(BaseMemoryRetriever):
             )
 
     def _get_cue_inventory(self) -> List[MemoryEntry]:
-        """Lazily fetch and cache every cue entry for the current memory store."""
         if self._cue_cache is None:
             try:
                 self._cue_cache = self.memory_client.get_all_cues()
@@ -399,24 +383,13 @@ class HybridRetriever(BaseMemoryRetriever):
         trigger: str,
         latency_tracker=None,
     ) -> List[MemoryEntry]:
-        """Use LLM reasoning to pick relevant cues, then resolve their linked memories.
-
-        Steps:
-          1. Build a numbered list of every cue (its index text) plus all
-             primary memory indices, so the LLM has full coverage.
-          2. Ask the LLM which entries connect to the trigger.
-          3. For chosen cue entries, follow their links back to primary
-             memories. For chosen primary entries, return them as-is.
-        """
         cue_entries = self._get_cue_inventory()
         if not cue_entries:
             logger.info("Cue-scan: no cues in store — skipping")
             return []
 
-        # Numbered catalogue of (display_text, entry_or_None) pairs.
         catalogue: List[tuple] = [(entry.index, entry) for entry in cue_entries]
 
-        # Format for the LLM prompt.
         cue_lines = [f"[{pos}] {text}" for pos, (text, _) in enumerate(catalogue)]
         cue_list_str = "\n".join(cue_lines)
 
@@ -446,7 +419,6 @@ class HybridRetriever(BaseMemoryRetriever):
             logger.warning(f"Cue-scan LLM call failed: {exc}")
             return []
 
-        # Map chosen indices to actual primary memories.
         resolved: List[MemoryEntry] = []
         seen_indices: set = set()
 
@@ -485,12 +457,6 @@ class HybridRetriever(BaseMemoryRetriever):
         memories: List[MemoryEntry],
         latency_tracker=None,
     ) -> List[MemoryEntry]:
-        """Score every candidate memory for cognitive relevance and drop the noise.
-
-        Returns the memories that scored at least 2, sorted by (LLM score
-        descending, original position). On any failure the original list
-        is returned untouched.
-        """
         if not memories:
             return memories
 
@@ -519,7 +485,7 @@ class HybridRetriever(BaseMemoryRetriever):
 
             kept: List[MemoryEntry] = []
             for entry in memories:
-                llm_score = score_map.get(entry.index, 2)  # default keep when missing
+                llm_score = score_map.get(entry.index, 2)
                 entry.score = float(llm_score)
                 if llm_score >= 2:
                     kept.append(entry)
@@ -588,14 +554,6 @@ class HybridRetriever(BaseMemoryRetriever):
         latency_tracker=None,
         **kwargs,
     ) -> List[MemoryEntry]:
-        """
-        Run the hybrid retrieval pipeline:
-
-        1. Single LLM call: rewrite the query and decide whether to decompose.
-        2. Always: dual-query search (rewritten + original).
-        3. If decomposition is required: execute plan steps and merge.
-        4. Dedup-merge every source list.
-        """
         self.last_trace = []
 
         if top_k is None:
@@ -615,10 +573,8 @@ class HybridRetriever(BaseMemoryRetriever):
             latency_tracker=latency_tracker,
         )
 
-        # Step 1: single LLM analysis.
         result = self._analyze_query(query, latency_tracker)
 
-        # Step 1.5: search the commonsense-expanded probes from step 1.
         expansion_memories: List[MemoryEntry] = []
         if result.expanded_queries:
             exp_top_k = self.query_expansion_top_k or top_k
@@ -631,7 +587,6 @@ class HybridRetriever(BaseMemoryRetriever):
                 except Exception as exc:
                     logger.warning(f"Expansion query search failed for '{eq[:60]}': {exc}")
 
-        # Step 2: always-on dual-query search.
         try:
             reform_memories = self.memory_client.query(
                 result.search_query, **search_kwargs
@@ -646,7 +601,6 @@ class HybridRetriever(BaseMemoryRetriever):
             logger.error(f"Original query search failed: {exc}")
             orig_memories = []
 
-        # Step 3: optional plan execution.
         plan_memories: List[MemoryEntry] = []
         if result.needs_decomposition and len(result.steps) > 1:
             plan = QueryPlan(steps=result.steps, reasoning=result.reasoning)
@@ -671,8 +625,6 @@ class HybridRetriever(BaseMemoryRetriever):
                 )
                 plan_memories = []
 
-        # Step 4: cue-scan — let the LLM reason over EVERY cue to find
-        # cognitive links the embedding search may have missed.
         cue_scan_memories: List[MemoryEntry] = []
         if self.enable_cue_scan:
             try:
@@ -680,8 +632,6 @@ class HybridRetriever(BaseMemoryRetriever):
             except Exception as exc:
                 logger.warning(f"Cue-scan failed: {exc}. Continuing without cue-scan.")
 
-        # Step 5: weighted-RRF merge over all source lists.
-        # Reformulated > original > cue-scan > expansion = plan.
         source_lists: List[List[MemoryEntry]] = []
         source_weights: List[float] = []
         for lst, w in [
@@ -700,7 +650,6 @@ class HybridRetriever(BaseMemoryRetriever):
         else:
             memories = []
 
-        # Step 5.5: post-filter — LLM scores cognitive relevance, noise drops.
         pre_filter = len(memories)
         if self.enable_post_filter and memories:
             try:
@@ -708,8 +657,6 @@ class HybridRetriever(BaseMemoryRetriever):
             except Exception as exc:
                 logger.warning(f"Post-filter failed: {exc}. Continuing unfiltered.")
 
-        # Step 6: session expansion — pull in additional memories from
-        # any session that already had a hit.
         pre_expansion = len(memories)
         if self.enable_session_expansion and memories:
             try:
@@ -719,8 +666,6 @@ class HybridRetriever(BaseMemoryRetriever):
             except Exception as exc:
                 logger.warning(f"Session expansion failed: {exc}. Continuing without expansion.")
 
-        # Final sort: session-expanded entries default to score 0, so
-        # RRF-scored entries naturally float to the top when truncated.
         memories.sort(key=lambda m: m.score, reverse=True)
 
         self._log_retrieval(
@@ -731,7 +676,6 @@ class HybridRetriever(BaseMemoryRetriever):
         )
         self._log_final_memories(query, memories)
 
-        # Record the full trace.
         post_filter_kept = pre_expansion if self.enable_post_filter else pre_filter
         self.last_trace.append({
             "action": "HYBRID_RETRIEVE",
@@ -755,5 +699,4 @@ class HybridRetriever(BaseMemoryRetriever):
         return memories
 
     def get_trace(self) -> List[Dict]:
-        """Return the trace recorded by the most recent ``retrieve()`` call."""
         return self.last_trace

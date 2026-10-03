@@ -15,7 +15,6 @@ def merge_with_rrf(
     weights: Optional[List[float]] = None,
     k: int = 60,
 ) -> List[MemoryEntry]:
-    """Fuse ranked memory lists using weighted Reciprocal Rank Fusion."""
     if weights is None:
         weights = [1.0] * len(result_lists)
     if len(weights) != len(result_lists):
@@ -52,17 +51,6 @@ def merge_with_rrf(
 
 
 class MemoryUpdateDecision(BaseModel):
-    """Structured LLM output describing whether to update an existing memory.
-
-    Using a Pydantic schema instead of free-form JSON gives us validation
-    and removes brittle manual parsing in the call sites.
-
-    Attributes:
-        should_update: whether an existing memory should be updated.
-        best_candidate_index: chosen candidate index when ``should_update``.
-        updated_index: rewritten index string for the merged memory.
-        updated_cue_indices: cue indices to attach to the merged memory.
-    """
 
     should_update: bool = Field(
         description="Whether an existing memory entry should be updated"
@@ -78,12 +66,9 @@ class MemoryUpdateDecision(BaseModel):
         description="Updated list of 1-3 cue indices for the merged memory. Each cue is a 2-4 word phrase following [Main Entity] + [Key Aspect] pattern. Generate fresh cue indices that cover diverse aspects of the merged memory content.",
         default_factory=list,
     )
-    # Note: reasoning field commented out to reduce LLM response complexity
-    # reasoning: str = Field(description="Explanation of the decision")
 
 
 def combine_list(list_string1: str, list_string2: str, delimiter: str = "||") -> str:
-    """Merge two delimited "list-as-string" values, removing duplicates."""
     if not list_string1 and not list_string2:
         return ""
     if not list_string1:
@@ -122,12 +107,6 @@ def generate_metadata(content: str, metadata: Optional[dict]) -> dict:
 
 
 def delete_candidate_memory(candidate: MemoryEntry, memory_store: MemoryStoreBase):
-    """Remove a candidate memory and any cue-index links pointing at it.
-
-    Args:
-        candidate: the memory entry to delete.
-        memory_store: backing store on which deletes are issued.
-    """
     cand_idx = candidate.index
     cues: str = candidate.cue_indices
 
@@ -203,17 +182,6 @@ def format_memories_to_str(
     memories: List[MemoryEntry],
     enable_episodic: bool = False,
 ) -> str:
-    """Render a list of ``MemoryEntry`` objects to a printable string.
-
-    Args:
-        memories: entries to render.
-        enable_episodic: when ``True`` group entries by their associated
-            episodic ids; when ``False`` use the simple ``timestamp: value``
-            line-per-entry format.
-
-    Returns:
-        Formatted text representation. Empty string for an empty input.
-    """
     if not memories:
         return ""
 
@@ -224,7 +192,6 @@ def format_memories_to_str(
             lines.append(f"{ts}: {mem.value}")
         return "\n".join(lines)
 
-    # Episodic clustering branch.
     clusters: dict = {}
     standalone: List[MemoryEntry] = []
 
@@ -255,7 +222,6 @@ def format_memories_to_str(
 
 
 def dedup_memories(memories: List[MemoryEntry]) -> List[MemoryEntry]:
-    """Deduplicate memories by their ``index``, keeping the first occurrence."""
     seen: set = set()
     unique: List[MemoryEntry] = []
 

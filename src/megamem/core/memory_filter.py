@@ -9,15 +9,12 @@ from megamem.core.memory_entry import MemoryEntry
 logger = logging.getLogger(__name__)
 
 
-# Pydantic schemas describing the structured LLM output
 class MemoryScore(BaseModel):
-    """One memory's relevance verdict."""
     index: str = Field(description="The memory index/key")
     score: int = Field(description="Relevance score from 1-5", ge=1, le=3)
 
 
 class MemoryScoreResponse(BaseModel):
-    """Wrapper around the full list of per-memory scores."""
     scores: List[MemoryScore] = Field(description="List of memory scores")
 
 
@@ -99,35 +96,20 @@ class MemoryFilter:
         query: str,
         memory_results: List["MemoryEntry"],
     ) -> List["MemoryEntry"]:
-        """
-        Use an LLM to score retrieved memories against the current query
-        and drop the ones deemed irrelevant.
-
-
-        Args:
-            query: The original query/context string
-            memory_results: List of retrieved MemoryEntry objects to filter
-
-        Returns:
-            Filtered list of MemoryEntry objects
-        """
         if not memory_results:
             return memory_results
 
-        # Build the per-memory listing using the [memory_index]: value template the LLM expects.
         memories_text = "\n".join(
             f"[{entry.index}]: {entry.get_memory_value()}"
             for entry in memory_results
         )
 
-        # Bundle prompt arguments for the LLM call.
         prompt_args = {
             "query": query,
             "memories_text": memories_text,
         }
 
         try:
-            # Ask the LLM and parse via the structured response schema.
             response = self._model_client.invoke(
                 input=PROMPT_MEMORY_FILTER,
                 prompt_args=prompt_args,
@@ -136,7 +118,6 @@ class MemoryFilter:
 
             score_lookup = {item.index: item.score for item in response.scores}
 
-            # Sanity check: the LLM should return a score for each memory we sent.
             if len(score_lookup) != len(memory_results):
                 logger.warning(
                     f"LLM returned {len(score_lookup)} scores but expected {len(memory_results)}. "
@@ -144,14 +125,12 @@ class MemoryFilter:
                 )
                 return memory_results
 
-            # Threshold + tag with (entry, llm_score, search_score) tuples for downstream sort.
             scored_results = []
             for entry in memory_results:
                 llm_score = score_lookup.get(entry.index, 0)
-                if llm_score >= 2:  # keep relevance levels 2 and 3
+                if llm_score >= 2:
                     scored_results.append((entry, llm_score, entry.score))
 
-            # Order primarily by LLM score, breaking ties with the search score.
             scored_results.sort(key=lambda triple: (triple[1], triple[2]), reverse=True)
 
             filtered_results = [entry for entry, _, _ in scored_results]

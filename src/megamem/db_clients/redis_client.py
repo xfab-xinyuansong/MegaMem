@@ -1,16 +1,8 @@
-"""Redis Stack-backed vector store client.
-
-Requires ``redis-py`` 4.0+. Install with::
-
-    pip install redis
-"""
 import json
 from typing import Any, Dict, List, Optional
 
 from omegaconf import DictConfig
 
-# Soft-import the Redis stack so the rest of the package can still be
-# imported on environments where ``redis`` is unavailable.
 REDIS_AVAILABLE = False
 try:
     import numpy as np
@@ -28,7 +20,6 @@ from megamem.utils.embedding import BaseEmbeddingModel
 
 
 class RedisVectorDBClient(VectorDBClient):
-    """``VectorDBClient`` backed by Redis Stack search/JSON modules."""
 
     DEFAULT_INDEXED_FIELDS = [
         "user_id",
@@ -38,12 +29,6 @@ class RedisVectorDBClient(VectorDBClient):
     ]
 
     def __init__(self, cfg: DictConfig):
-        """Initialise a Redis-backed vector client.
-
-        Args:
-            cfg: configuration object; reads connection params and
-                ``embedding_dim``/``distance`` from ``cfg.memory``.
-        """
         self.cfg = cfg
 
         host = cfg.memory.get("redis_host", "localhost")
@@ -51,8 +36,6 @@ class RedisVectorDBClient(VectorDBClient):
         db = cfg.memory.get("redis_db", 0)
         password = cfg.memory.get("redis_password", None)
 
-        # We deliberately keep raw bytes from Redis to make vector handling
-        # explicit; JSON encoding/decoding is done manually where needed.
         self.client = Redis(
             host=host,
             port=port,
@@ -71,35 +54,22 @@ class RedisVectorDBClient(VectorDBClient):
         elif metric == "L2":
             self.distance_metric = "L2"
         else:
-            self.distance_metric = "IP"  # Inner product
+            self.distance_metric = "IP"
 
         self.indexed_fields = self.DEFAULT_INDEXED_FIELDS
 
-        # Cached metadata per collection name.
         self._collections = {}
 
     def _get_collection_prefix(self, collection_name: str) -> str:
-        """Redis-key prefix for documents belonging to ``collection_name``."""
         return f"collection:{collection_name}"
 
     def _get_index_name(self, collection_name: str) -> str:
-        """Search-index name associated with ``collection_name``."""
         return f"idx:{collection_name}"
 
     def _get_doc_key(self, collection_name: str, doc_id: str) -> str:
-        """Full Redis key for a stored document JSON."""
         return f"{self._get_collection_prefix(collection_name)}:doc:{doc_id}"
 
     def get_or_create_collection(self, collection_name: str, metadata: Dict[str, Any]):
-        """Return cached collection info, creating the search index on demand.
-
-        Args:
-            collection_name: collection identifier.
-            metadata: collection metadata stored alongside the cached entry.
-
-        Returns:
-            Collection info dictionary used by other methods.
-        """
         index_name = self._get_index_name(collection_name)
 
         try:
@@ -111,12 +81,10 @@ class RedisVectorDBClient(VectorDBClient):
             }
             return self._collections[collection_name]
         except Exception:
-            # Index missing — fall through and create it.
             pass
 
         from redis.commands.search.field import TagField
 
-        # Static schema columns shared by every collection.
         schema_fields = [
             TextField("$.id", as_name="id"),
             TextField("$.document", as_name="document"),
@@ -135,8 +103,6 @@ class RedisVectorDBClient(VectorDBClient):
             NumericField("$.timestamp", as_name="timestamp"),
         ]
 
-        # Each indexed metadata field gets both a TEXT and a TAG variant so
-        # both fuzzy search and exact filtering are cheap.
         for field_name in self.indexed_fields:
             schema_fields.append(TextField(f"$.{field_name}", as_name=field_name))
             schema_fields.append(
@@ -185,15 +151,6 @@ class RedisVectorDBClient(VectorDBClient):
         metadatas: List[Dict[str, Any]],
         embeddings: Optional[List[List[float]]] = None,
     ):
-        """Insert or replace documents in the Redis collection.
-
-        Args:
-            collection: collection info dict from ``get_or_create_collection``.
-            ids: per-document identifiers.
-            documents: raw document texts.
-            metadatas: per-document metadata.
-            embeddings: optional pre-computed embedding vectors.
-        """
         collection_name = collection["name"]
 
         if embeddings is None:
@@ -206,7 +163,6 @@ class RedisVectorDBClient(VectorDBClient):
 
             embedding_list = np.array(embedding, dtype=np.float32).tolist()
 
-            # Coerce timestamp to a number so the NumericField indexes it.
             ts_val = metadata.get("timestamp", 0)
             if isinstance(ts_val, str):
                 try:
@@ -214,8 +170,6 @@ class RedisVectorDBClient(VectorDBClient):
                 except Exception:
                     ts_val = 0
 
-            # Redis TAG fields cannot index empty strings, so we substitute
-            # a sentinel value and translate it back on read.
             def tag_value(val):
                 return "__EMPTY__" if val == "" or val is None else val
 
@@ -246,18 +200,6 @@ class RedisVectorDBClient(VectorDBClient):
         where: Optional[Any] = None,
         include: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        """Run a vector similarity search.
-
-        Args:
-            collection: collection info dict from ``get_or_create_collection``.
-            query_texts: search query string.
-            n_results: max number of results to return.
-            where: optional filter (ChromaDB-flavoured ``$and``/``$or``/``$eq`` etc.).
-            include: fields to include in results (currently informational).
-
-        Returns:
-            Result dictionary in ChromaDB-compatible shape.
-        """
         index_name = collection["index_name"]
         collection_name = collection["name"]
 
@@ -265,10 +207,9 @@ class RedisVectorDBClient(VectorDBClient):
         query_vector = np.array(query_embedding, dtype=np.float32).tobytes()
 
         filter_parts: List[str] = []
-        post_filters: List[tuple] = []  # Conditions Redis can't natively express.
+        post_filters: List[tuple] = []
 
         def escape_redis_value(val: str) -> str:
-            """Escape characters that would otherwise break a TAG query."""
 
             special_chars = [
                 ",", ".", "<", ">", "{", "}", "[", "]", '"', "'", ":", ";",
@@ -281,15 +222,12 @@ class RedisVectorDBClient(VectorDBClient):
             return escaped
 
         def process_condition(key, value):
-            """Translate a single ``key, value`` clause into Redis filters."""
             if isinstance(value, dict):
                 if "$ne" in value:
                     ne_val = value["$ne"]
                     if ne_val == "":
-                        # "Has any value" — match any populated TAG entry.
                         filter_parts.append(f"@{key}_tag:{{*}}")
                     else:
-                        # Negation against a specific TAG value.
                         escaped_val = escape_redis_value(str(ne_val))
                         filter_parts.append(f"-@{key}_tag:{{{escaped_val}}}")
                 elif "$eq" in value:
@@ -321,7 +259,6 @@ class RedisVectorDBClient(VectorDBClient):
                     for key, value in cond.items():
                         process_condition(key, value)
             elif "$or" in where:
-                # Redis OR — combine alternatives with the pipe operator.
                 or_parts: List[str] = []
                 for cond in where["$or"]:
                     for key, value in cond.items():
@@ -332,7 +269,6 @@ class RedisVectorDBClient(VectorDBClient):
                             elif "$ne" in value and value["$ne"] == "":
                                 or_parts.append(f"@{key}_tag:{{*}}")
                             else:
-                                # Anything else is too complex for Redis; defer.
                                 for op, op_val in value.items():
                                     post_filters.append((key, op, op_val))
                         elif isinstance(value, str):
@@ -344,8 +280,6 @@ class RedisVectorDBClient(VectorDBClient):
                 for key, value in where.items():
                     process_condition(key, value)
 
-        # Decide how many results to ask Redis for, given the mix of
-        # native and post filters.
         if filter_parts:
             filter_str = "(" + " ".join(filter_parts) + ")"
             fetch_count = n_results * 2 if post_filters else n_results
@@ -379,8 +313,6 @@ class RedisVectorDBClient(VectorDBClient):
         for doc in results.docs:
             doc_id = doc.id.split(":")[-1]
 
-            # Re-fetch the full JSON document; search results sometimes
-            # omit fields we care about.
             doc_key = self._get_doc_key(collection_name, doc_id)
             full_doc = self.client.json().get(doc_key)
 
@@ -424,8 +356,6 @@ class RedisVectorDBClient(VectorDBClient):
             metadatas.append(metadata)
 
             score = float(getattr(doc, "score", 0))
-            # Both COSINE and L2/IP are returned with "smaller is better"
-            # semantics in this codepath, so we forward the raw score.
             distances.append(score)
 
             documents.append(full_doc.get("document", ""))
@@ -449,7 +379,6 @@ class RedisVectorDBClient(VectorDBClient):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Read records back from a Redis collection."""
         collection_name = collection["name"]
         index_name = collection["index_name"]
 
@@ -547,23 +476,12 @@ class RedisVectorDBClient(VectorDBClient):
         }
 
     def delete(self, collection, ids: List[str]):
-        """Delete documents by id.
-
-        Args:
-            collection: collection info dict.
-            ids: list of identifiers to remove.
-        """
         collection_name = collection["name"]
 
         for doc_id in ids:
             self.client.delete(self._get_doc_key(collection_name, doc_id))
 
     def count(self, collection) -> int:
-        """Return the number of documents in the collection.
-
-        Args:
-            collection: collection info dict.
-        """
         index_name = collection["index_name"]
 
         try:
@@ -573,11 +491,6 @@ class RedisVectorDBClient(VectorDBClient):
             return 0
 
     def delete_collection(self, collection_name: str):
-        """Drop the index and every document for the given collection.
-
-        Args:
-            collection_name: collection identifier to delete.
-        """
         index_name = self._get_index_name(collection_name)
         prefix = f"{self._get_collection_prefix(collection_name)}:doc:*"
 
@@ -586,7 +499,6 @@ class RedisVectorDBClient(VectorDBClient):
         except Exception:
             pass
 
-        # Sweep up any remaining keys that match the collection prefix.
         cursor = 0
         while True:
             cursor, keys = self.client.scan(cursor, match=prefix, count=100)

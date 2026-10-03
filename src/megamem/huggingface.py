@@ -1,10 +1,3 @@
-"""Load the public EnterpriseRAG extension from Hugging Face.
-
-The dependency on :mod:`datasets` is optional and is imported only when one of
-the loaders is called. Streaming is enabled by default because the document
-configuration is intended for corpus-scale experiments.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -56,7 +49,6 @@ def load_enterprise_rag_documents(
     token: str | bool | None = None,
     **kwargs: Any,
 ) -> Any:
-    """Load source documents with ``doc_id``, type, title, and content fields."""
     return _load_config(
         DOCUMENT_CONFIG,
         split=split,
@@ -75,7 +67,6 @@ def load_enterprise_rag_questions(
     token: str | bool | None = None,
     **kwargs: Any,
 ) -> Any:
-    """Load benchmark questions, references, expected sources, and answer facts."""
     return _load_config(
         QUESTION_CONFIG,
         split=split,
@@ -94,7 +85,6 @@ def load_enterprise_rag(
     token: str | bool | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Load the document and question configurations with identical options."""
     common = {
         "split": split,
         "streaming": streaming,

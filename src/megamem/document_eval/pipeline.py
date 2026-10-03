@@ -1,4 +1,3 @@
-"""Document build pipeline."""
 from __future__ import annotations
 
 import hashlib
@@ -34,16 +33,6 @@ PROGRESS_FILENAME = "_doc_build_progress.jsonl"
 
 
 class DocumentBuildPipeline:
-    """Build raw_chunks + distilled_memory + cognitive + summaries in one pass.
-
-    Build phases can be toggled to support per-algorithm ablations:
-    - build_distilled=False           → DDI Stream B disabled (cheap baselines)
-    - build_cognitive=False           → CDM build disabled
-    - build_section_summaries=False   → HDM Layer 3 disabled
-    - build_document_summaries=False  → HDM Layer 2 disabled
-
-    The raw_chunks collection is always built (everything else depends on it).
-    """
 
     def __init__(self, cfg: DocumentRetrievalConfig, storage: Optional[DocumentStorage] = None):
         self.cfg = cfg
@@ -73,7 +62,6 @@ class DocumentBuildPipeline:
         return os.path.join(self.cfg.chroma_path, PROGRESS_FILENAME)
 
     def _load_progress(self) -> Set[str]:
-        """Return the set of doc_ids previously marked done in this chroma_path."""
         p = self._progress_path
         if not os.path.exists(p):
             return set()
@@ -89,19 +77,16 @@ class DocumentBuildPipeline:
                         if rec.get("stage") == "done" and rec.get("doc_id"):
                             done.add(rec["doc_id"])
                     except json.JSONDecodeError:
-                        # Tolerate a truncated final line from a crash
                         continue
         except OSError as exc:
             logger.warning(f"Failed to read progress journal {p}: {exc}")
         return done
 
     def _append_progress(self, recs: List[Dict[str, Any]]) -> None:
-        """Append one or more progress records and fsync (for crash safety)."""
         if not recs:
             return
         p = self._progress_path
         os.makedirs(self.cfg.chroma_path, exist_ok=True)
-        # Open with line buffering + fsync to ensure durability after each shard.
         with open(p, "a", buffering=1) as f:
             for rec in recs:
                 f.write(json.dumps(rec) + "\n")
@@ -109,10 +94,9 @@ class DocumentBuildPipeline:
             try:
                 os.fsync(f.fileno())
             except OSError:
-                pass  # best effort; not all filesystems support fsync on regular files
+                pass
 
     def reset_progress(self) -> None:
-        """Drop the progress journal (caller's responsibility before force_rebuild)."""
         p = self._progress_path
         if os.path.exists(p):
             os.remove(p)
@@ -132,7 +116,6 @@ class DocumentBuildPipeline:
         shard_size: int = 25,
         progress_every: int = 25,
     ) -> Dict[str, Any]:
-        """Run the build pipeline."""
         t_start = time.time()
         self._reset_stats()
 
@@ -140,9 +123,8 @@ class DocumentBuildPipeline:
             logger.info("force_rebuild=True: dropping all doc_eval collections + progress journal")
             self.storage.reset_all()
             self.reset_progress()
-            resume = False  # any meaningful resume requires the journal we just wiped
+            resume = False
 
-        # Stage 1: dedup input by doc_id and apply resume filter
         docs = list(documents)
         seen_ids: Set[str] = set()
         deduped: List[Dict[str, Any]] = []
@@ -173,7 +155,6 @@ class DocumentBuildPipeline:
         self.stats["n_documents"] = len(docs)
         logger.info(f"Pipeline build start: {len(docs)} doc(s) to process; shard_size={shard_size}")
 
-        # Stage 2: process docs in shards
         shards = [docs[i : i + shard_size] for i in range(0, len(docs), shard_size)]
         for shard_idx, shard_docs in enumerate(shards):
             self._process_shard(
@@ -208,16 +189,10 @@ class DocumentBuildPipeline:
         max_extract_workers: int,
         progress_every: int,
     ) -> None:
-        """Process one shard of docs atomically.
-
-        Order: segment → extract distilled+cognitive (parallel) → section/doc
-        summaries → batched upsert per collection → append progress journal.
-        """
         t_shard = time.time()
         shard_label = f"shard {shard_idx + 1}/{n_shards} ({len(shard_docs)} docs)"
         logger.info(f"[{shard_label}] start")
 
-        # 1. Segment all docs in shard
         shard_raw: List[RawChunkEntry] = []
         shard_section_specs: List[Dict[str, Any]] = []
         shard_doc_meta: List[Dict[str, Any]] = []
@@ -230,7 +205,6 @@ class DocumentBuildPipeline:
             content = doc.get("content") or ""
             if not content.strip():
                 self.stats["skipped_docs"] += 1
-                # Mark as done so resume skips empty docs (no work to retry).
                 self._append_progress([{
                     "doc_id": doc_id,
                     "stage": "done",
@@ -291,7 +265,6 @@ class DocumentBuildPipeline:
             logger.info(f"[{shard_label}] all docs empty; nothing to upsert")
             return
 
-        # 2. Extract distilled + cognitive (parallel across chunks in shard)
         shard_distilled: List[DistilledMemoryEntry] = []
         shard_cognitive: List[CognitiveEntry] = []
         if (build_distilled or build_cognitive) and shard_raw:
@@ -307,7 +280,6 @@ class DocumentBuildPipeline:
             )
             self.stats["extract_seconds"] += time.time() - t_extract
 
-        # 3. Section summaries
         shard_section_nodes: List[SectionNode] = []
         if build_section_summaries:
             for s in shard_section_specs:
@@ -332,11 +304,8 @@ class DocumentBuildPipeline:
                     token_count=s["token_count"],
                 ))
 
-        # 4. Doc summaries (depends on section summaries; we can compose in-memory
-        #    from shard_section_nodes built above; no chroma round-trip needed.)
         shard_doc_nodes: List[DocumentNode] = []
         if build_document_summaries:
-            # Build a per-doc map of section summaries from what we just computed.
             section_summary_text_by_id: Dict[str, str] = {
                 n.section_id: f"{n.section_path}: {n.summary}" for n in shard_section_nodes
             }
@@ -357,7 +326,6 @@ class DocumentBuildPipeline:
                     token_count=d["token_count"],
                 ))
 
-        # 5. Batched upsert per collection (one trip per collection per shard)
         if build_raw_chunks and shard_raw:
             self._upsert_raw_chunks(shard_raw)
         if build_distilled and shard_distilled:
@@ -413,7 +381,6 @@ class DocumentBuildPipeline:
             d_local: List[DistilledMemoryEntry] = []
             c_local: List[CognitiveEntry] = []
             if use_combined:
-                # Stage 2 Option E: 1 LLM call returns both lists.
                 d_local, c_local = extract_combined_distilled_and_cognitive(
                     self.cfg,
                     chunk_id=r.chunk_id,

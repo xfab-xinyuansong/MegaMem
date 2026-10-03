@@ -1,5 +1,3 @@
-"""Dual-query reformulation retrieval."""
-
 import logging
 import time
 from typing import Any, Dict, List, Optional
@@ -17,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class ReformulatedQuery(BaseModel):
-    """LLM-generated optimized search query."""
     search_query: str = Field(
         description=(
             "An optimized search query rewritten from the user's question. "
@@ -83,7 +80,6 @@ Produce the optimized search query.\
 
 
 class QueryReformulationRetriever(BaseMemoryRetriever):
-    """Rewrite-then-search retriever using a dual-query merge."""
 
     def __init__(
         self,
@@ -111,13 +107,6 @@ class QueryReformulationRetriever(BaseMemoryRetriever):
         query: str,
         latency_tracker=None,
     ) -> tuple:
-        """
-        Run the LLM rewrite step and return ``(search_query, reasoning)``.
-
-        On any failure the method gracefully degrades by returning the
-        original query along with a fallback explanation, so callers can
-        treat the result as always-valid without extra error handling.
-        """
         try:
             llm_start = time.time()
             llm_output: ReformulatedQuery = self.model_client.invoke(
@@ -195,14 +184,6 @@ class QueryReformulationRetriever(BaseMemoryRetriever):
         latency_tracker=None,
         **kwargs,
     ) -> List[MemoryEntry]:
-        """
-        Run dual-query reformulation:
-
-        1. Ask the LLM for an optimized rewrite of the question.
-        2. Search the store with the rewritten query.
-        3. Search the store with the original query.
-        4. Dedup-merge — rewrite results take priority in ordering.
-        """
         self.last_trace = []
 
         if top_k is None:
@@ -222,24 +203,20 @@ class QueryReformulationRetriever(BaseMemoryRetriever):
             latency_tracker=latency_tracker,
         )
 
-        # 1. Rewrite the query.
         reformulated, reasoning = self._reformulate_query(query, latency_tracker)
 
-        # 2. Search with the rewritten query.
         try:
             reform_memories = self.memory_client.query(reformulated, **search_kwargs)
         except Exception as exc:
             logger.error(f"Reformulated query search failed: {exc}")
             reform_memories = []
 
-        # 3. Search with the user's original phrasing.
         try:
             orig_memories = self.memory_client.query(query, **search_kwargs)
         except Exception as exc:
             logger.error(f"Original query search failed: {exc}")
             orig_memories = []
 
-        # 4. Merge — rewrite results come first to bias ordering.
         memories = dedup_memories(reform_memories + orig_memories)
 
         self._log_retrieval(
@@ -261,5 +238,4 @@ class QueryReformulationRetriever(BaseMemoryRetriever):
         return memories
 
     def get_trace(self) -> List[Dict]:
-        """Return the trace recorded by the most recent ``retrieve()`` call."""
         return self.last_trace

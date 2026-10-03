@@ -43,34 +43,27 @@ pip install chromadb
 
 #### Interactive Browser (Default)
 ```bash
-# Browse memory store
 python -m megamem.browser /path/to/memory_store
 
-# Browse specific collection
 python -m megamem.browser /path/to/memory_store -c megamem
 
-# Verbose output
 python -m megamem.browser /path/to/memory_store --verbose
 ```
 
 #### Quick Statistics
 ```bash
-# Show quick stats
 python -m megamem.browser /path/to/memory_store --stats
 ```
 
 #### Search and Analysis
 ```bash
-# Search with results
 python -m megamem.browser /path/to/memory_store --search "incident management"
 
-# Search with export
 python -m megamem.browser /path/to/memory_store --search "procedures" --output results.json
 ```
 
 #### Comprehensive Analysis
 ```bash
-# Generate analysis report
 python -m megamem.browser /path/to/memory_store --analyze --output report.json
 ```
 
@@ -112,20 +105,15 @@ export <format> <path> - Export documents (json/csv/txt)
 ```python
 from megamem.browser import MemoryViewer
 
-# Initialize viewer
 viewer = MemoryViewer(db_path="/path/to/memory_store")
 
-# Get quick statistics
 stats = viewer.quick_stats()
 print(stats)
 
-# Generate comprehensive summary
 summary = viewer.get_memory_summary(include_samples=True)
 
-# Search and analyze
 results = viewer.search_and_analyze("incident management", n_results=10)
 
-# Export analysis report
 viewer.export_analysis_report("analysis_report.json")
 ```
 
@@ -133,22 +121,16 @@ viewer.export_analysis_report("analysis_report.json")
 ```python
 from megamem.browser import ChromaBrowser
 
-# Initialize browser
 browser = ChromaBrowser(db_path="/path/to/memory_store", collection_name="megamem")
 
-# Get all documents
 documents = browser.get_all_documents(limit=100)
 
-# Search documents
 results = browser.search_documents("emergency procedures", n_results=5)
 
-# Filter by metadata
 filtered = browser.filter_documents({"source_file": "handbook.md"})
 
-# Get statistics
 stats = browser.get_collection_stats()
 
-# Export documents
 browser.export_documents(documents, "export.json", format="json")
 ```
 
@@ -156,7 +138,6 @@ browser.export_documents(documents, "export.json", format="json")
 ```python
 from megamem.browser import InteractiveMemoryBrowser
 
-# Launch interactive session
 browser = InteractiveMemoryBrowser(db_path="/path/to/memory_store")
 browser.run()
 ```
@@ -237,7 +218,6 @@ class ChromaStats:
 
 ### Browse VOM Memory Store
 ```bash
-# Browse VOM system memory
 python -m megamem.browser ./vom_memory_store
 
 💭 Memory Browser > collections
@@ -249,16 +229,13 @@ Memory Browser > search "service outage"
 
 ### Analyze Memory Patterns
 ```bash
-# Generate comprehensive analysis
 python -m megamem.browser ./memory_store --analyze --output analysis.json
 
-# Search specific topics
 python -m megamem.browser ./memory_store --search "incident procedures" --limit 20
 ```
 
 ### Filter and Export
 ```bash
-# Interactive filtering
 python -m megamem.browser ./memory_store
 
 💭 Memory Browser > filter source_file=handbook.md
@@ -287,10 +264,8 @@ The browser includes comprehensive error handling:
 
 ### Testing
 ```bash
-# Run test suite
 python test_browser.py
 
-# Test with specific memory store
 python -m megamem.browser /path/to/test/store --stats
 ```
 
@@ -304,10 +279,8 @@ python -m megamem.browser /path/to/test/store --stats
 
 ### With VOM System
 ```python
-# In VOM interactive mode
 from megamem.browser import InteractiveMemoryBrowser
 
-# Launch browser for VOM memory store
 browser = InteractiveMemoryBrowser(db_path="./vom_memory_store")
 browser.run()
 ```
@@ -317,11 +290,8 @@ browser.run()
 from megamem.browser import MemoryViewer
 from megamem.client import MemoryClient
 
-# Analyze memory after building
 client = MemoryClient(config)
-# ... build memory ...
 
-# Analyze results
 viewer = MemoryViewer(db_path=config['persist_path'])
 summary = viewer.get_memory_summary()
 ```

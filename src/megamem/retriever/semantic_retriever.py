@@ -1,10 +1,3 @@
-"""
-Pure-similarity retrieval strategy.
-
-Thin wrapper around ``AgentMemory.query`` that performs a single semantic
-(or hybrid) lookup with no planning, reformulation, or iteration.
-"""
-
 import time
 from typing import Any, Dict, List, Optional
 from omegaconf import DictConfig
@@ -15,21 +8,12 @@ from megamem.core.memory import AgentMemory, QueryMode
 
 
 class SemanticRetriever(BaseMemoryRetriever):
-    """Vector-similarity backed memory retrieval."""
 
     def __init__(
         self,
         cfg: DictConfig,
         memory_client: Optional[AgentMemory] = None,
     ):
-        """
-        Build the semantic retriever from the shared configuration.
-
-        Args:
-            cfg: Configuration object
-            memory_client: Optional pre-initialized memory client
-            user_id: User identifier
-        """
         super().__init__(cfg)
         self.memory_client = memory_client
 
@@ -52,8 +36,6 @@ class SemanticRetriever(BaseMemoryRetriever):
         latency_tracker = None,
         **kwargs
     ) -> List[MemoryEntry]:
-        """Issue a single semantic query against the memory store."""
-        # Fall back to configured defaults when callers leave overrides empty.
         if top_k is None:
             top_k = self.top_k
         if enable_hybrid_search is None:
@@ -63,8 +45,6 @@ class SemanticRetriever(BaseMemoryRetriever):
         if query_mode is None:
             query_mode = self.query_mode
 
-        # Restrict to factual entries; episodic memories are reached
-        # transitively through their links rather than searched directly.
         return self.memory_client.query(
             query,
             top_k=top_k,

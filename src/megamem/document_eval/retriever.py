@@ -1,13 +1,3 @@
-"""
-DocumentRetriever — Option A architecture (HDM routing + DDI dual-stream + CDM).
-
-Toggles allow ablations to cover Option B (Flat) and Option C (Cascade) behaviors:
-
-  enable_hierarchical=False         → DDI + CDM only (HDM disabled)
-  enable_dual_index=False           → CDM-only path
-  enable_cdm=False                  → DDI + HDM only
-  document_routing_enabled=False    → Stage 1 default; HDM routing OFF
-"""
 from __future__ import annotations
 
 import json
@@ -25,7 +15,6 @@ from megamem.document_eval.types import DocumentRetrievalConfig
 logger = logging.getLogger(__name__)
 
 
-# Maps each source memory type to depth-one expansion targets.
 RELATION_ADJACENCY: Dict[str, List[str]] = {
     "constraint": ["exception", "requirement", "decision", "dependency", "risk", "conflict", "version_update"],
     "exception": ["constraint", "procedure", "requirement", "example"],
@@ -60,15 +49,9 @@ QUERY_INTENT_KEYWORDS: List[Tuple[List[str], List[str]]] = [
 
 
 def classify_query_intent(query: str) -> Tuple[List[str], List[str]]:
-    """Return (primary_types, secondary_types) for a query.
-
-    This classifier is deterministic and makes no model calls.
-    Fallback: ('fact', 'definition') + ('recommendation', 'example') for generic.
-    """
     q = query.lower()
     for kws, primary in QUERY_INTENT_KEYWORDS:
         if any(k in q for k in kws):
-            # Secondary: union of adjacency targets of each primary, deduped, capped.
             secondary: List[str] = []
             for p in primary:
                 for t in RELATION_ADJACENCY.get(p, []):
@@ -83,10 +66,6 @@ def reciprocal_rank_fusion(
     weights: Optional[List[float]] = None,
     k_const: int = 60,
 ) -> List[Tuple[str, float, Dict[str, Any]]]:
-    """Standard RRF over multiple ranked lists.
-
-    Each list is [(id, score, payload), ...]; score is ignored, rank is used.
-    """
     if not ranked_lists:
         return []
     if weights is None:
@@ -104,10 +83,9 @@ def reciprocal_rank_fusion(
 
 @dataclass
 class RetrievalResult:
-    """Structured retrieval output: ranked chunks + metadata."""
 
     query: str
-    chunks: List[Dict[str, Any]] = field(default_factory=list)  # final ranked chunk dicts
+    chunks: List[Dict[str, Any]] = field(default_factory=list)
     documents_retrieved: List[str] = field(default_factory=list)
     primary_cognitive_types: List[str] = field(default_factory=list)
     secondary_cognitive_types: List[str] = field(default_factory=list)
@@ -116,7 +94,6 @@ class RetrievalResult:
 
 
 class DocumentRetriever:
-    """Option A retriever with toggles for ablations."""
 
     def __init__(self, cfg: DocumentRetrievalConfig, storage: Optional[DocumentStorage] = None):
         self.cfg = cfg
@@ -128,7 +105,6 @@ class DocumentRetriever:
         trace: Dict[str, Any] = {}
         cfg = self.cfg
 
-        # --- Step 1: Cognitive intent analysis (cheap, always done if CDM enabled) ---
         primary_types: List[str] = []
         secondary_types: List[str] = []
         if cfg.enable_cdm and cfg.enable_cognitive_path:
@@ -136,7 +112,6 @@ class DocumentRetriever:
             result.primary_cognitive_types = primary_types
             result.secondary_cognitive_types = secondary_types
 
-        # --- Step 2: HDM routing (Stage 1 default OFF; Flat fallback) ---
         candidate_doc_ids: Optional[List[str]] = None
         candidate_section_ids: Optional[List[str]] = None
         if cfg.enable_hierarchical and cfg.document_routing_enabled:
@@ -154,7 +129,6 @@ class DocumentRetriever:
             except Exception as exc:
                 logger.warning(f"Section routing failed: {exc}")
 
-        # --- Step 3: DDI dual-stream retrieval ---
         ranked_raw: List[Tuple[str, float, Dict[str, Any]]] = []
         ranked_distilled: List[Tuple[str, float, Dict[str, Any]]] = []
         if cfg.enable_dual_index and cfg.enable_raw_stream:
@@ -174,7 +148,6 @@ class DocumentRetriever:
             )
             trace["distilled_stream_n"] = len(ranked_distilled)
 
-        # --- Step 4: CDM cognitive retrieval ---
         ranked_cognitive_primary: List[Tuple[str, float, Dict[str, Any]]] = []
         ranked_cognitive_expansion: List[Tuple[str, float, Dict[str, Any]]] = []
         if cfg.enable_cdm and cfg.enable_cognitive_path and primary_types:
@@ -203,8 +176,6 @@ class DocumentRetriever:
             except Exception as exc:
                 logger.warning(f"Cognitive retrieval failed: {exc}")
 
-        # --- Step 5: Combine all into final chunk list ---
-        # All candidates need to map back to raw chunks (the final evidence unit).
         chunk_scores: Dict[str, float] = defaultdict(float)
         chunk_meta: Dict[str, Dict[str, Any]] = {}
         ranked_lists: List[List[Tuple[str, float, Dict[str, Any]]]] = []
@@ -213,17 +184,14 @@ class DocumentRetriever:
         def _to_chunk_list(
             entries: List[Tuple[str, float, Dict[str, Any]]]
         ) -> List[Tuple[str, float, Dict[str, Any]]]:
-            """Convert retrieved entries (any kind) into a ranked list keyed by chunk_id."""
             out: List[Tuple[str, float, Dict[str, Any]]] = []
             seen: set = set()
             for _id, score, payload in entries:
                 meta = payload.get("metadata", {}) or {}
-                # Resolve to chunk_id (raw_chunks index by chunk_id; others have chunk_id in meta)
                 chunk_id = meta.get("chunk_id") or _id
                 if chunk_id in seen:
                     continue
                 seen.add(chunk_id)
-                # Also propagate source_chunk_ids (comma-sep) when present
                 extra_chunks = meta.get("source_chunk_ids", "") or ""
                 if extra_chunks and isinstance(extra_chunks, str):
                     for cid in extra_chunks.split(","):
@@ -251,8 +219,7 @@ class DocumentRetriever:
 
         fused = reciprocal_rank_fusion(ranked_lists, weights=weights)
 
-        # Take top-N chunk_ids and fetch raw text from raw_chunks collection
-        top_ids = [cid for cid, _, _ in fused[: cfg.top_n_final * 2]]  # over-fetch then trim
+        top_ids = [cid for cid, _, _ in fused[: cfg.top_n_final * 2]]
         chunk_docs_map = self._fetch_chunks(top_ids)
 
         final_chunks: List[Dict[str, Any]] = []
@@ -296,7 +263,6 @@ class DocumentRetriever:
         n_results: int,
         where: Optional[Dict[str, Any]] = None,
     ) -> List[Tuple[str, float, Dict[str, Any]]]:
-        """Query a chroma collection and return [(id, sim_score, payload)] in rank order."""
         if self.storage.count(kind) == 0:
             return []
         res = self.storage.query(
@@ -319,7 +285,6 @@ class DocumentRetriever:
     def _build_where(
         self, doc_ids: Optional[List[str]], section_ids: Optional[List[str]]
     ) -> Optional[Dict[str, Any]]:
-        """Build a Chroma 'where' filter for HDM-routed candidates."""
         clauses = []
         if section_ids:
             clauses.append({"section_id": {"$in": section_ids}})
@@ -344,7 +309,6 @@ class DocumentRetriever:
         return {"$and": [a, b]}
 
     def _fetch_chunks(self, chunk_ids: List[str]) -> Dict[str, Dict[str, Any]]:
-        """Fetch chunk raw text + metadata by chunk_id."""
         out: Dict[str, Dict[str, Any]] = {}
         if not chunk_ids:
             return out

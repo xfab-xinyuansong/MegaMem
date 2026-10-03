@@ -1,10 +1,3 @@
-"""
-ChromaDB browser primitives.
-
-Wraps a persistent ChromaDB collection with a thin, dataclass-based API
-for listing, searching, filtering and exporting documents.
-"""
-
 import os
 import json
 import logging
@@ -27,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ChromaDocument:
-    """A single document materialised from a ChromaDB result."""
     id: str
     content: str
     metadata: Dict[str, Any]
@@ -37,7 +29,6 @@ class ChromaDocument:
 
 @dataclass
 class ChromaStats:
-    """Aggregate metrics describing a ChromaDB collection."""
     total_documents: int
     collection_name: str
     metadata_keys: List[str]
@@ -46,21 +37,8 @@ class ChromaStats:
 
 
 class ChromaBrowser:
-    """
-    Lightweight wrapper around a ChromaDB collection.
-
-    Exposes search, filtering and analysis helpers on top of the underlying
-    persistent client.
-    """
 
     def __init__(self, db_path: str, collection_name: str = None):
-        """
-        Build the browser.
-
-        Args:
-            db_path: Path to ChromaDB database directory
-            collection_name: Name of collection to browse (if None, will list available)
-        """
         if not CHROMADB_AVAILABLE:
             raise ImportError("ChromaDB is not available. Please install with: pip install chromadb")
 
@@ -76,7 +54,6 @@ class ChromaBrowser:
         self._cache_valid = False
 
     def _initialize_client(self) -> None:
-        """Open the persistent ChromaDB client and bind the target collection."""
         try:
             self.client = chromadb.PersistentClient(
                 path=str(self.db_path),
@@ -90,7 +67,6 @@ class ChromaBrowser:
                 raise ValueError(f"No collections found in database: {self.db_path}")
 
             if self.collection_name is None:
-                # Default to the first collection if the caller didn't pick one.
                 self.collection_name = names[0]
             elif self.collection_name not in names:
                 raise ValueError(
@@ -105,12 +81,6 @@ class ChromaBrowser:
             raise
 
     def list_collections(self) -> List[str]:
-        """
-        Enumerate every collection in the persistent store.
-
-        Returns:
-            List[str]: Collection names
-        """
         try:
             return [col.name for col in self.client.list_collections()]
         except Exception as e:
@@ -118,19 +88,10 @@ class ChromaBrowser:
             return []
 
     def switch_collection(self, collection_name: str) -> bool:
-        """
-        Re-bind the browser to a different collection.
-
-        Args:
-            collection_name: Name of collection to switch to
-
-        Returns:
-            bool: True if successful
-        """
         try:
             self.collection = self.client.get_collection(collection_name)
             self.collection_name = collection_name
-            self._cache_valid = False  # invalidate any cached docs
+            self._cache_valid = False
             self.logger.info(f"Switched to collection: {collection_name}")
             return True
         except Exception as e:
@@ -142,16 +103,6 @@ class ChromaBrowser:
         limit: Optional[int] = None,
         include_embeddings: bool = False,
     ) -> List[ChromaDocument]:
-        """
-        Return every document in the collection (up to ``limit``).
-
-        Args:
-            limit: Maximum number of documents to return
-            include_embeddings: Whether to include embedding vectors
-
-        Returns:
-            List[ChromaDocument]: Documents from the collection
-        """
         try:
             include_list = ["documents", "metadatas"]
             if include_embeddings:
@@ -195,17 +146,6 @@ class ChromaBrowser:
         n_results: int = 10,
         where_filter: Optional[Dict[str, Any]] = None,
     ) -> List[ChromaDocument]:
-        """
-        Run a semantic similarity search.
-
-        Args:
-            query: Search query
-            n_results: Number of results to return
-            where_filter: Metadata filter conditions
-
-        Returns:
-            List[ChromaDocument]: Matching documents with distances
-        """
         try:
             payload = self.collection.query(
                 query_texts=[query],
@@ -244,12 +184,6 @@ class ChromaBrowser:
             return []
 
     def get_collection_stats(self) -> ChromaStats:
-        """
-        Compute aggregate statistics over the collection.
-
-        Returns:
-            ChromaStats: Collection statistics
-        """
         try:
             if not self._cache_valid:
                 self.get_all_documents()
@@ -303,16 +237,6 @@ class ChromaBrowser:
         where_filter: Dict[str, Any],
         limit: Optional[int] = None,
     ) -> List[ChromaDocument]:
-        """
-        Restrict documents to those matching ``where_filter``.
-
-        Args:
-            where_filter: Filter conditions
-            limit: Maximum results to return
-
-        Returns:
-            List[ChromaDocument]: Filtered documents
-        """
         try:
             payload = self.collection.get(
                 where=where_filter,
@@ -345,14 +269,6 @@ class ChromaBrowser:
         file_path: str,
         format: str = "json",
     ) -> None:
-        """
-        Persist ``documents`` to disk in the requested format.
-
-        Args:
-            documents: Documents to export
-            file_path: Output file path
-            format: Export format (json, csv, txt)
-        """
         try:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
@@ -373,7 +289,6 @@ class ChromaBrowser:
             raise
 
     def _export_json(self, documents: List[ChromaDocument], file_path: str) -> None:
-        """Write ``documents`` as a JSON document with light metadata."""
         data = {
             "export_timestamp": datetime.now().isoformat(),
             "collection_name": self.collection_name,
@@ -385,7 +300,6 @@ class ChromaBrowser:
             json.dump(data, fh, indent=2, ensure_ascii=False)
 
     def _export_csv(self, documents: List[ChromaDocument], file_path: str) -> None:
-        """Write ``documents`` to a CSV file with a small per-row preview."""
         import csv
 
         with open(file_path, 'w', newline='', encoding='utf-8') as fh:
@@ -402,7 +316,6 @@ class ChromaBrowser:
                 ])
 
     def _export_txt(self, documents: List[ChromaDocument], file_path: str) -> None:
-        """Write a human-readable plain-text dump of ``documents``."""
         with open(file_path, 'w', encoding='utf-8') as fh:
             fh.write(f"ChromaDB Export - {datetime.now().isoformat()}\n")
             fh.write(f"Collection: {self.collection_name}\n")

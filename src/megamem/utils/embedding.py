@@ -23,7 +23,6 @@ def _cfg_get(cfg: Optional[DictConfig], key: str, default: str = "") -> str:
 
 
 def get_general_embedding_client(cfg: Optional[DictConfig] = None) -> GeneralAPIClient:
-    """Build a general embeddings API client."""
     base_url = (
         os.getenv("EMBEDDING_API_BASE")
         or os.getenv("LLM_API_BASE")
@@ -43,12 +42,6 @@ def get_general_embedding_client(cfg: Optional[DictConfig] = None) -> GeneralAPI
 
 
 class BaseEmbeddingModel:
-    """Embedding wrapper with a local-first default.
-
-    Local sentence-transformers embeddings are used by default. Set
-    ``MEGAMEM_LOCAL_EMBEDDING=0`` to route through a hosted endpoint
-    configured with general `EMBEDDING_API_*` variables.
-    """
 
     def __init__(
         self,
@@ -66,7 +59,7 @@ class BaseEmbeddingModel:
             if cached is None:
                 try:
                     from sentence_transformers import SentenceTransformer
-                except ImportError as exc:  # pragma: no cover
+                except ImportError as exc:
                     raise RuntimeError(
                         "MEGAMEM_LOCAL_EMBEDDING=1 but sentence-transformers is "
                         "not installed. Install: pip install sentence-transformers"
@@ -88,14 +81,12 @@ class BaseEmbeddingModel:
         self.client = client if client else get_general_embedding_client(cfg)
 
     def get_client(self) -> Optional[GeneralAPIClient]:
-        """Return the hosted embedding client, or None in local mode."""
         return self.client
 
     def generate_embeddings(
         self,
         input: List[str],
     ) -> List[List[float]]:
-        """Embed a batch of strings."""
         if getattr(self, "_is_local", False):
             vecs = self._local_model.encode(
                 input,

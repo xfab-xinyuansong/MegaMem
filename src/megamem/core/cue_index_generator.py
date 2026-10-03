@@ -71,11 +71,6 @@ class BatchCueIndices(BaseModel):
 
 
 class CueIndexGenerator:
-    """Backward-compatible cue index generator for memories.
-
-    New builders generate cue and primary indices in one model call. This class remains
-    available for callers using the earlier two-stage workflow.
-    """
 
     def __init__(self, cfg: DictConfig, model_client: ChatCompletionModel):
         self.cfg = cfg
@@ -85,21 +80,11 @@ class CueIndexGenerator:
         self,
         memories: List[Dict[str, str]],
     ) -> Dict[str, List[str]]:
-        """
-        Produce cue indices for several memories in a single LLM round-trip.
-
-        Args:
-            memories: List of dictionaries with 'index' and 'value' keys
-
-        Returns:
-            Dictionary mapping memory indices to their cue indices
-        """
         logger.warning(
             "CueIndexGenerator.generate_cue_indices_batch() is deprecated. "
             "Cue indices are now generated together with memory extraction."
         )
 
-        # Compose the bullet-list of memories that the prompt expects.
         chunks = []
         for pos, mem in enumerate(memories, 1):
             chunks.append(f"\nMemory {pos}:\nPrimary Index: {mem['index']}\nMemory Value: {mem['value']}")
@@ -128,7 +113,6 @@ class CueIndexGenerator:
                 ]
             )
 
-        # Flatten the structured response into a {primary_index: [cue,...]} mapping.
         return {item.memory_index: item.cue_indices for item in result.results}
 
     def generate_cue_indices(
@@ -136,20 +120,8 @@ class CueIndexGenerator:
         memory_value: str,
         primary_index: str,
     ) -> List[str]:
-        """
-        Produce cue indices for a single memory.
-
-        Args:
-            memory_value: The memory content
-            primary_index: The primary memory index
-
-        Returns:
-            List of cue indices
-        """
-        # Reuse the batch helper with a one-element list.
         result = self.generate_cue_indices_batch(
             [{"index": primary_index, "value": memory_value}]
         )
 
-        # Look up cues by primary index, defaulting to an empty list.
         return result.get(primary_index, [])

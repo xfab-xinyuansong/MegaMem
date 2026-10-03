@@ -1,5 +1,3 @@
-"""Trajectory collector for GRPO-style retrieval learning."""
-
 from __future__ import annotations
 
 import json
@@ -19,16 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 class ActionType(Enum):
-    """MDP action labels."""
-    # Currently only QUERY actions and STOP are used.
     QUERY_PRIMARY_INDEX = "query_primary"
     QUERY_CUE_INDEX = "query_cue"
 
     STOP = "stop"
 
 
-# Per-action cost charged against the trajectory budget.
-# A toggle to disable budgeting may be added later.
 ACTION_COSTS = {
     ActionType.QUERY_PRIMARY_INDEX: 1.0,
     ActionType.QUERY_CUE_INDEX: 1.0,
@@ -39,35 +33,31 @@ ACTION_COSTS = {
 
 @dataclass
 class RetrievalState:
-    """MDP state s_t = (q_t, W_t, F_t, b_t)."""
-    query: str                              # current query q_t
-    retrieved_memories: List[str]           # W_t: retrieved memory indices
-    frontier: List[str]                     # F_t: candidate frontier
-    budget: float                           # b_t: remaining budget
+    query: str
+    retrieved_memories: List[str]
+    frontier: List[str]
+    budget: float
     step: int = 0
 
 
 @dataclass
 class RetrievalAction:
-    """A single action taken at step t."""
     action_type: ActionType
-    target_memory_index: Optional[str] = None  # selected memory (if applicable)
-    new_query: Optional[str] = None            # rewritten query (if reformulate)
-    score: float = 0.0                         # selection score
+    target_memory_index: Optional[str] = None
+    new_query: Optional[str] = None
+    score: float = 0.0
 
 
 @dataclass
 class RetrievalStep:
-    """Captured (s_t, a_t) record for a single trajectory step."""
     step_idx: int
-    state: Dict  # serialised state
-    action: Dict  # serialised action
-    reward: float = 0.0  # may be sparse
+    state: Dict
+    action: Dict
+    reward: float = 0.0
 
 
 @dataclass
 class Trajectory:
-    """One end-to-end retrieval trajectory."""
     query: str
     user_id: str
     steps: List[RetrievalStep] = field(default_factory=list)
@@ -77,7 +67,6 @@ class Trajectory:
     evidence: List[str] = field(default_factory=list)
     trajectory_score: Optional[float] = None
 
-    # Per-trajectory scoring components.
     groundedness: Optional[float] = None
     redundancy: Optional[float] = None
     cost: Optional[float] = None
@@ -115,14 +104,6 @@ class Trajectory:
 
 
 class TrajectoryCollector:
-    """
-    Collects retrieval trajectories under a Policy-Guided Sequential
-    Retrieval framing.
-
-    Today the existing megamem retrieval is used as a behaviour policy
-    with optional softmax stochasticity for exploration; a learnt policy can
-    be plugged in later.
-    """
 
     def __init__(
             self,
@@ -138,7 +119,6 @@ class TrajectoryCollector:
         self.client_cache: Dict[str, MemoryClient] = {}
 
     def get_client(self, user_id: str) -> MemoryClient:
-        """Memoised MemoryClient lookup keyed by user_id."""
         from megamem.client import MemoryClient
 
         client = self.client_cache.get(user_id)
@@ -152,12 +132,6 @@ class TrajectoryCollector:
             query: str,
             client: MemoryClient,
     ) -> Tuple[List[MemoryEntry], List[MemoryEntry]]:
-        """
-        Build the initial frontier F_0.
-
-        Returns ``(primary_candidates, cue_candidates)`` from independent
-        seed queries against the primary and cue indices.
-        """
         primary_results = client.query(
             query,
             top_k=self.top_k,
@@ -180,12 +154,6 @@ class TrajectoryCollector:
         temperature: float = 0.0,
         policy_network=None,
     ) -> RetrievalAction:
-        """
-        Sample pi(a_t | s_t).
-
-        Uses a supplied policy when present and otherwise applies score-based
-        selection with optional softmax exploration.
-        """
 
         if policy_network is not None:
             action = policy_network.select_action(
@@ -197,12 +165,10 @@ class TrajectoryCollector:
                 raise TypeError("policy_network.select_action() must return RetrievalAction")
             return action
 
-        # Drop already-collected memories to avoid duplication.
         already = state.retrieved_memories
         available_primary = [m for m in primary_candidates if m.index not in already]
         available_cue = [m for m in cue_candidates if m.index not in already]
 
-        # Stop if we've exhausted budget or candidates.
         if state.budget <= 0 or (not available_primary and not available_cue):
             return RetrievalAction(action_type=ActionType.STOP)
 
@@ -218,7 +184,6 @@ class TrajectoryCollector:
             probs = self._softmax(scores, temperature)
             chosen_idx = random.choices(range(len(all_candidates)), weights=probs)[0]
         else:
-            # Greedy: highest score wins.
             chosen_idx = max(range(len(all_candidates)), key=lambda i: all_candidates[i][2])
 
         chosen = all_candidates[chosen_idx]
@@ -236,12 +201,6 @@ class TrajectoryCollector:
         primary_candidates: List[MemoryEntry],
         cue_candidates: List[MemoryEntry],
     ) -> Tuple[Set[str], MemoryEntry, float]:
-        """
-        Execute action a_t and report what was retrieved.
-
-        Returns:
-            ``(new_memories, retrieved_entry, cost)``
-        """
         new_memories: Set[str] = set()
         retrieved_entry: Optional[MemoryEntry] = None
         cost = ACTION_COSTS[action.action_type]
@@ -250,7 +209,6 @@ class TrajectoryCollector:
             return new_memories, retrieved_entry, cost
 
         if action.action_type in (ActionType.QUERY_PRIMARY_INDEX, ActionType.QUERY_CUE_INDEX):
-            # Find the memory whose index matches the targeted one.
             for m in primary_candidates + cue_candidates:
                 if m.index == action.target_memory_index:
                     retrieved_entry = m
@@ -258,7 +216,6 @@ class TrajectoryCollector:
 
             if retrieved_entry is not None:
                 if retrieved_entry.is_cue_index():
-                    # Cue indices link to primary memory indices; expand them.
                     for primary_idx in retrieved_entry.get_linked_memories():
                         if primary_idx in state.retrieved_memories:
                             continue
@@ -279,7 +236,6 @@ class TrajectoryCollector:
             temperature: float = 0.0,
             policy_network=None,
     ) -> Trajectory:
-        """Roll out one trajectory for ``query``."""
         client = self.get_client(user_id)
 
         state = RetrievalState(
@@ -353,7 +309,6 @@ class TrajectoryCollector:
 
             if retrieved_entry is not None:
                 if retrieved_entry.is_cue_index():
-                    # Cue index: expand to its linked primary memories.
                     for primary_idx in retrieved_entry.get_linked_memories():
                         primary_entry = client._client._megamem.get(primary_idx)
                         if primary_entry:
@@ -385,12 +340,6 @@ class TrajectoryCollector:
         G: int = 4,
         temperatures: List[float] = None,
     ) -> List[Trajectory]:
-        """
-        Collect ``G`` trajectories for a single query (one GRPO group).
-
-        Default temperature schedule: greedy followed by mildly increasing
-        stochastic samples (τ_0 = 0.0, τ_g = 0.3 + 0.2 * (g-1)).
-        """
         if temperatures is None:
             temperatures = [0.0] + [0.3 + 0.2 * i for i in range(G - 1)]
 
@@ -410,7 +359,6 @@ class TrajectoryCollector:
         return trajectories
 
     def _softmax(self, scores: List[float], temperature: float) -> List[float]:
-        """Numerically-stable softmax with temperature."""
         if not scores:
             return []
         scaled = [s / max(temperature, 1e-8) for s in scores]
@@ -418,23 +366,3 @@ class TrajectoryCollector:
         exps = [math.exp(s - max_s) for s in scaled]
         total = sum(exps)
         return [e / total for e in exps]
-
-    '''
-    # Might Use in Future Implementation (if going with dynamic frontier)
-    # TRAVERSE_A→C: From a retrieved primary, add its cues to frontier
-    def _traverse_primary_to_cue(self, primary_entry, cue_candidates, state):
-        """Expand frontier with primary's cue indices"""
-        new_cues = []
-        for cue_idx in primary_entry.get_cue_indices():
-            if cue_idx not in [c.index for c in cue_candidates]:
-                if cue_idx not in state.retrieved_memories:
-                    cue_entry = self.client._client._megamem.get(cue_idx)
-                    if cue_entry:
-                        new_cues.append(cue_entry)
-        cue_candidates.extend(new_cues)
-        return new_cues  # ΔF (frontier expansion, no retrieval)
-
-    # TRAVERSE_C→C: From a cue, find semantically related cues
-    # This would require additional infrastructure (cue-to-cue links)
-    # NOT currently supported in the codebase
-    '''

@@ -1,6 +1,3 @@
-"""Helpers for loading/splitting LoCoMo data into QA pairs and persisting
-trajectories collected during RL rollouts."""
-
 import json
 from typing import Dict, List, Tuple
 import random
@@ -14,7 +11,6 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 @dataclass
 class QAPair:
-    """One question-answer record paired with its source conversation context."""
     query: str
     answer: str
     category: str
@@ -32,13 +28,6 @@ def load_and_split_locomo(
         test_ratio: float = 0.1,
         seed: int = 42,
 ) -> Tuple[List[Dict], List[Dict], List[Dict]]:
-    """
-    Load LoCoMo and partition it conversation-wise into train / val / test.
-
-    Returns:
-        Tuple of (train_data, val_data, test_data) — each entry is a list of
-        per-conversation dicts.
-    """
     assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6, \
         f"Ratios must sum to 1.0, got {train_ratio + val_ratio + test_ratio}"
 
@@ -47,7 +36,6 @@ def load_and_split_locomo(
     with open(data_path, 'r') as fh:
         raw = json.load(fh)
 
-    # The dataset has shipped in both dict-keyed and list form; normalise.
     if isinstance(raw, dict):
         raw = list(raw.values())
 
@@ -75,13 +63,6 @@ def load_and_split_locomo(
 
 
 def extract_qa_pairs(conversation_data: List[Dict]) -> List[QAPair]:
-    """
-    Flatten a list of conversation dicts into QA pairs ready for trajectory
-    collection.
-
-    Returns:
-        List of fully-populated :class:`QAPair` objects.
-    """
     qa_pairs: List[QAPair] = []
     for conv_idx, item in enumerate(conversation_data):
         conversation = item.get("conversation", {})
@@ -91,8 +72,6 @@ def extract_qa_pairs(conversation_data: List[Dict]) -> List[QAPair]:
         user_id = f"{speaker_a}_{speaker_b}_{conv_idx}"
 
         for qa in item.get("qa", []):
-            # Some adversarial-only items (category 5) only carry an
-            # ``adversarial_answer``; fall back gracefully.
             answer = qa.get("answer") or qa.get("adversarial_answer", "")
 
             if not answer:
@@ -101,7 +80,6 @@ def extract_qa_pairs(conversation_data: List[Dict]) -> List[QAPair]:
             qa_pairs.append(
                 QAPair(
                     query=qa["question"],
-                    # A handful of answers are integers — cast to string.
                     answer=str(answer),
                     category=str(qa.get("category", "unknown")),
                     evidence=qa.get("evidence", []),
@@ -115,14 +93,12 @@ def extract_qa_pairs(conversation_data: List[Dict]) -> List[QAPair]:
 
 
 def save_trajectories(trajectories: List[Dict], output_path: str):
-    """Write ``trajectories`` to ``output_path`` as pretty JSON."""
     with open(output_path, 'w') as fh:
         json.dump(trajectories, fh, indent=2)
     print(f"Saved {len(trajectories)} trajectories to {output_path}")
 
 
 def load_trajectories(input_path: str) -> List[Dict]:
-    """Read previously saved trajectories from a JSON file."""
     with open(input_path, 'r') as fh:
         return json.load(fh)
 

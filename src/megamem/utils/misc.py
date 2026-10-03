@@ -6,12 +6,10 @@ import tiktoken
 
 
 def index_to_id(key: str) -> str:
-    # Deterministic hash → record id mapping.
     return hashlib.sha256(key.encode("utf-8")).hexdigest()
 
 
 def count_tokens(content: str) -> int:
-    """Count tokens with the package's default ``cl100k_base`` encoding."""
     enc = tiktoken.get_encoding("cl100k_base")
     return len(enc.encode(content))
 
@@ -20,7 +18,6 @@ def normalize_content(
     content: Union[str, List[str], List[Dict[str, Any]]],
     multimodal_support: bool = True,
 ):
-    """Normalise heterogeneous context input into a uniform shape."""
     text_parts: List[str] = []
     image_parts: List[Dict[str, Any]] = []
 
@@ -78,11 +75,6 @@ def normalize_content(
 def context_to_str(
     context: Union[str, List[str], List[Dict[str, str]]],
 ):
-    """Backward-compatible string-only adapter around ``normalize_content``.
-
-    Image parts are dropped. Prefer ``normalize_content`` directly when
-    writing new code.
-    """
     return normalize_content(context, multimodal_support=False)["text"]
 
 
@@ -96,23 +88,10 @@ def add_and_condition(where: Optional[dict], new_condition: dict) -> dict:
 
 
 def get_current_timestamp() -> str:
-    """Current local time formatted as ``YYYY-MM-DD HH:MM:SS``.
-
-    Returns:
-        Current timestamp in ISO 8601 format with UTC timezone (YYYY-MM-DDTHH:MM:SS.mmmZ)
-    """
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def extract_user_id_from_where(where: Optional[dict]) -> Optional[str]:
-    """Pull a ``user_id`` value out of a ChromaDB-style ``where`` clause.
-
-    Args:
-        where: filter dict, possibly nested under ``$and``.
-
-    Returns:
-        The first ``user_id`` value found, or ``None``.
-    """
     if where is None:
         return None
     if "user_id" in where:
@@ -127,17 +106,6 @@ def extract_user_id_from_where(where: Optional[dict]) -> Optional[str]:
 def merge_metadata(
     segment_metadata: Optional[Dict], user_metadata: Optional[Dict]
 ) -> Dict:
-    """Combine segment-derived metadata with user-supplied metadata.
-
-    User metadata takes precedence on key collisions.
-
-    Args:
-        segment_metadata: metadata extracted from the segment.
-        user_metadata: metadata provided by the caller.
-
-    Returns:
-        Merged metadata dictionary.
-    """
     merged: Dict = {}
     if segment_metadata:
         merged.update(segment_metadata)
@@ -147,43 +115,27 @@ def merge_metadata(
 
 
 def extension_to_type(extension: str) -> str:
-    """Translate a file extension into a memory-builder file-type tag.
-
-    Args:
-        extension: extension string (with or without leading dot).
-
-    Returns:
-        File-type tag understood by the memory-builder selector. Falls
-        back to ``"text"`` for unknown extensions.
-    """
     extension = extension.lower().strip(".")
 
     ext_map = {
-        # Text files
         "txt": "text",
         "md": "markdown",
         "markdown": "markdown",
-        # Document files
         "doc": "word",
         "docx": "word",
         "pdf": "pdf",
         "rtf": "text",
-        # Spreadsheet files
         "xls": "excel",
         "xlsx": "excel",
         "csv": "table",
-        # Presentation files
         "ppt": "powerpoint",
         "pptx": "powerpoint",
-        # Web files
         "html": "html",
         "htm": "html",
         "xml": "xml",
-        # Data files
         "json": "json",
         "yaml": "yaml",
         "yml": "yaml",
-        # Code files (treat as text)
         "py": "text",
         "js": "text",
         "ts": "text",

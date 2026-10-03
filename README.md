@@ -25,10 +25,10 @@ source ID before fusion, deduplication, and reranking; only the highest-ranked d
 evidence within a fixed budget reaches the answer model.
 
 <p align="center">
-  <img src="assets/megamem_overview_evidence_context.png" width="100%" alt="MegaMem maps ultra-large external memory to a bounded evidence context">
+  <img src="assets/megamem_overview_evidence_context.png" width="100%" alt="MegaMem dual-view retrieval, bounded evidence generation, and post-answer attribution">
 </p>
 
-<p align="center"><em>The persistent context can grow to approximately 650M tokens while each query loads only a small, source-resolved evidence context for answering.</em></p>
+<p align="center"><em>Original and transformed queries search both memory views; resolved source evidence is fused and reranked within a fixed budget for generation, followed by attribution that preserves the answer.</em></p>
 
 ## Evidence-Driven Design Exploration
 
@@ -114,11 +114,11 @@ service client, and general model-gateway client without loading a vector databa
 local model runtime. Add only the capability groups needed for a deployment:
 
 ```bash
-pip install -e ".[retrieval,llm,documents]"  # complete local memory pipeline
-pip install -e ".[local-models]"             # optional local model execution
-pip install -e ".[evaluation]"               # evaluation metrics
-pip install -e ".[huggingface]"              # Hugging Face dataset streaming
-pip install -e ".[dev]"                      # tests and package build tools
+pip install -e ".[retrieval,llm,documents]"
+pip install -e ".[local-models]"
+pip install -e ".[evaluation]"
+pip install -e ".[huggingface]"
+pip install -e ".[dev]"
 ```
 
 ## Quick Start
@@ -166,7 +166,7 @@ pip install -e ".[huggingface]"
 ```python
 from megamem import load_enterprise_rag_documents, load_enterprise_rag_questions
 
-documents = load_enterprise_rag_documents()  # streaming=True by default
+documents = load_enterprise_rag_documents()
 questions = load_enterprise_rag_questions()
 
 first_document = next(iter(documents))
@@ -203,16 +203,16 @@ make check
 ```text
 MegaMem/
 ├── src/megamem/
-│   ├── methods/          # dual nodes, indexing, hierarchy construction, token ledger
-│   ├── document_eval/    # ingestion, retrieval, answering, and metrics
-│   ├── retriever/        # semantic, hybrid, planning, and reformulation strategies
-│   ├── builder/          # document, chat, and email memory builders
-│   ├── processors/       # text, PDF, Word, PowerPoint, Excel, and Markdown readers
-│   ├── core/             # memory entries, stores, filters, planners, and source cues
-│   └── db_clients/       # vector-store and cache adapters
-├── configs/              # public model-routing templates
-├── examples/             # runnable, credential-free examples
-├── tests/                # package and method checks
+│   ├── methods/
+│   ├── document_eval/
+│   ├── retriever/
+│   ├── builder/
+│   ├── processors/
+│   ├── core/
+│   └── db_clients/
+├── configs/
+├── examples/
+├── tests/
 ```
 
 <sub>Evaluation note. The evaluator in this repository is not identical to the official EnterpriseRAG-Bench evaluation pipeline, so local scores are not official leaderboard scores. Please refer to our submitted entry on the [official leaderboard](https://huggingface.co/spaces/onyx-dot-app/EnterpriseRAG-Bench-Leaderboard) once it is published.</sub>

@@ -1,10 +1,3 @@
-"""Model alias resolution for MegaMem.
-
-Configuration is loaded from ``MEGAMEM_MODELS_CONFIG`` when set, then from
-``configs/models.yaml`` in the current project, and finally from the packaged
-template. Missing aliases, unresolved providers, and placeholder model names
-fail loudly so runs cannot silently drift across model families.
-"""
 from __future__ import annotations
 
 import logging
@@ -30,7 +23,6 @@ _CACHE: Dict[Path, Dict[str, Any]] = {}
 
 
 def _load_project_env() -> None:
-    """Load a local ``.env`` when the optional LLM dependencies are installed."""
     try:
         from dotenv import load_dotenv
     except ImportError:
@@ -39,7 +31,6 @@ def _load_project_env() -> None:
 
 
 def models_config_path() -> Path:
-    """Return the model-alias configuration selected for this process."""
     _load_project_env()
     configured = os.environ.get(CONFIG_ENV_VAR, "").strip()
     if configured:
@@ -58,7 +49,6 @@ def models_config_path() -> Path:
 
 
 def clear_config_cache() -> None:
-    """Clear parsed model configs, primarily after changing config at runtime."""
     _CACHE.clear()
 
 
@@ -71,7 +61,6 @@ def _load_models_yaml() -> Dict[str, Any]:
 
 
 def resolve(alias: str) -> Dict[str, Any]:
-    """Return the spec for an alias."""
     cfg = _load_models_yaml()
     if not isinstance(cfg, dict):
         raise ModelAliasError(
@@ -112,7 +101,6 @@ def resolve(alias: str) -> Dict[str, Any]:
 
 
 def assert_active(alias: str) -> None:
-    """Raise if an alias is unavailable."""
     resolve(alias)
 
 
@@ -126,7 +114,6 @@ def smoke_test_general(
     spec: Dict[str, Any],
     message: str = "Say 'pong' and nothing else.",
 ) -> Dict[str, Any]:
-    """Perform a one-message chat API smoke test for an alias."""
     from megamem.core.general_api import GeneralAPIClient
 
     base_url = spec.get("base_url") or _env_value(spec, "base_url_env")
@@ -170,7 +157,6 @@ def smoke_test(alias: str) -> Dict[str, Any]:
 
 
 def list_aliases() -> Dict[str, str]:
-    """Return {alias: status} for diagnostics."""
     cfg = _load_models_yaml()
     if not isinstance(cfg, dict) or not isinstance(cfg.get("aliases", {}), dict):
         raise ModelAliasError(

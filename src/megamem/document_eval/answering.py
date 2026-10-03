@@ -1,9 +1,3 @@
-"""
-Answer generation from retrieved chunks, with fixed token budget.
-
-Constructs a prompt of [top-N chunks] -> question -> answer. Token budget is
-enforced by truncating the chunk list (in rank order) until budget fits.
-"""
 from __future__ import annotations
 
 import logging
@@ -35,7 +29,6 @@ Answer:"""
 
 
 def build_evidence_block(chunks: List[Dict[str, Any]], token_budget: int) -> Tuple[str, List[str]]:
-    """Pack chunks into prompt up to token_budget. Return (text, used_chunk_ids)."""
     parts: List[str] = []
     used_ids: List[str] = []
     used_tokens = 0
@@ -47,7 +40,6 @@ def build_evidence_block(chunks: List[Dict[str, Any]], token_budget: int) -> Tup
         block = f"{label}\n{text}\n"
         block_tokens = len(_ENC.encode(block))
         if used_tokens + block_tokens > token_budget:
-            # Try to fit a truncated version of the chunk
             remaining = token_budget - used_tokens
             if remaining < 100:
                 break
@@ -69,7 +61,6 @@ def generate_answer(
     question: str,
     chunks: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Generate a model answer + return diagnostic info."""
     evidence, used_ids = build_evidence_block(chunks, token_budget=cfg.llm_token_budget)
     user_prompt = ANSWER_PROMPT_USER_TEMPLATE.format(question=question, chunks=evidence or "(no evidence)")
     if not chunks:

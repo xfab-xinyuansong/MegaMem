@@ -1,5 +1,3 @@
-"""HTTP adapter for a deployed MegaMem service."""
-
 from __future__ import annotations
 
 import os
@@ -9,11 +7,10 @@ import requests
 
 
 class RemoteMemoryError(RuntimeError):
-    """Raised when a remote memory request cannot be completed."""
+    pass
 
 
 class RemoteMemoryClient:
-    """Small authenticated client for remote add and query operations."""
 
     def __init__(
         self,
@@ -67,7 +64,6 @@ class RemoteMemoryClient:
         context: Union[str, List[str], List[Dict[str, str]]],
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Any:
-        """Persist memory content through the remote service."""
         return self._request(
             "POST",
             "/api/v1/memory/add",
@@ -85,7 +81,6 @@ class RemoteMemoryClient:
         query_mode: Any = None,
         **kwargs: Any,
     ) -> Any:
-        """Search memories through the remote service."""
         mode = getattr(query_mode, "name", query_mode)
         payload = {
             "context": context,
@@ -109,7 +104,6 @@ class RemoteMemoryClient:
         top_k: int = 5,
         latency_tracker: Any = None,
     ) -> Any:
-        """Run planner retrieval through the remote service."""
         del latency_tracker
         query = context if isinstance(context, str) else str(context)
         return self._request(
