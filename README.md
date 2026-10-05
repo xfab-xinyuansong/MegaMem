@@ -203,8 +203,6 @@ MegaMem/
 ├── tests/
 ```
 
-<sub>Evaluation note. The evaluator in this repository is not identical to the official EnterpriseRAG-Bench evaluation pipeline, so local scores are not official leaderboard scores. Please refer to our submitted entry on the [official leaderboard](https://huggingface.co/spaces/onyx-dot-app/EnterpriseRAG-Bench-Leaderboard) once it is published.</sub>
-
 ## Package Scope
 
 This repository contains the installable implementation and public package contracts. It does not ship
