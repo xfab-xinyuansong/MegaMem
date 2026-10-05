@@ -91,7 +91,7 @@ Issues = "https://github.com/xfab-xinyuansong/MegaMem/issues"
 
 [project.scripts]
 megamem = "megamem.cli:main"
-megamem-experiments = "megamem.experiments.__main__:main"
+megamem-experiments = "megamem.document_eval.runner:experiment_main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

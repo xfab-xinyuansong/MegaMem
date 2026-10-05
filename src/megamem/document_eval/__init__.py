@@ -6,8 +6,7 @@ from megamem.document_eval.types import (
     DocumentNode,
     DocumentRetrievalConfig,
 )
-from megamem.document_eval.pipeline import DocumentBuildPipeline
-from megamem.document_eval.retriever import DocumentRetriever
+from importlib import import_module
 
 __all__ = [
     "RawChunkEntry",
@@ -19,3 +18,16 @@ __all__ = [
     "DocumentBuildPipeline",
     "DocumentRetriever",
 ]
+
+
+def __getattr__(name):
+    modules = {"DocumentBuildPipeline": "pipeline", "DocumentRetriever": "retriever"}
+    if name in modules:
+        value = getattr(import_module(f"{__name__}.{modules[name]}"), name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(set(globals()) | set(__all__))

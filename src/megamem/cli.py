@@ -189,6 +189,11 @@ def _build_parser() -> argparse.ArgumentParser:
     browser_parser.add_argument("--limit", "-l", type=int, default=10, help="Maximum results")
     browser_parser.add_argument("--no-interactive", action="store_true", help="Disable prompts")
     browser_parser.set_defaults(func=_dispatch_browser)
+    from .document_eval.runner import configure_experiment_parser
+
+    configure_experiment_parser(subparsers.add_parser(
+        "experiments", help="Plan, build, run, and compare the configured paper experiments"
+    ))
     return parser
 
 
