@@ -35,6 +35,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+experiments = [
+  "chromadb>=0.5.0",
+  "numpy>=1.26.0",
+  "pyarrow>=15.0.0",
+  "sentence-transformers>=2.6.0",
+  "tiktoken>=0.6.0",
+]
 retrieval = [
   "chromadb>=0.5.0",
   "faiss-cpu>=1.7.4",
@@ -84,6 +91,7 @@ Issues = "https://github.com/xfab-xinyuansong/MegaMem/issues"
 
 [project.scripts]
 megamem = "megamem.cli:main"
+megamem-experiments = "megamem.experiments.__main__:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
