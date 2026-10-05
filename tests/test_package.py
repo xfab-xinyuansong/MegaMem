@@ -646,7 +646,7 @@ def test_transfer_preserves_counts_and_question_local_corpus_scope():
 
 def test_paths_resolve_relative_to_yaml_and_isolate_scale_and_extractor():
     config = _config()
-    repo = PAPER_CONFIG.parents[2]
+    repo = PAPER_CONFIG.parents[1]
     for spec in make_specs(config, ["scaling", "gold"]):
         resolved = resolved_config(config, spec)
         assert Path(resolved["paths"]["questions"]) == repo / "data" / "enterprise" / "questions.jsonl"
@@ -659,7 +659,7 @@ def test_paths_resolve_relative_to_yaml_and_isolate_scale_and_extractor():
 
 def test_transfer_paths_do_not_reuse_enterprise_questions_or_split():
     config = _config()
-    repo = PAPER_CONFIG.parents[2]
+    repo = PAPER_CONFIG.parents[1]
     for spec in make_specs(config, ["transfer"]):
         resolved = resolved_config(config, spec)
         assert Path(resolved["paths"]["questions"]) == repo / "data" / spec.dataset / "questions.jsonl"
